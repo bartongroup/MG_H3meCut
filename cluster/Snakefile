@@ -1,0 +1,325 @@
+# Snakemake file for processing CUR&Tag data with bowtie and macs3
+# Using Ensembl genome and annotations
+#
+### To install from scratch
+#
+# mamba create --name h3mecut
+# mamba activate h3mecut
+# mamba install snakemake=7.32.4 fastqc multiqc samtools bedtools bowtie2 fastp fastq-screen drmaa ribodetector picard macs3
+#
+### To recreate the environment
+#
+# mamba create --name myenv --file spec-file.txt
+
+import os
+configfile: 'config/config.yaml'
+
+# Genome file configuration
+
+human_genome_url = "https://ftp.ensembl.org/pub/release-115/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+dm_genome_url = "https://ftp.ensembl.org/pub/release-115/fasta/drosophila_melanogaster/dna/Drosophila_melanogaster.BDGP6.54.dna.toplevel.fa.gz"
+
+human_genome_file = "genome/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
+dm_genome_file = "genome/Drosophila_melanogaster.BDGP6.54.dna.toplevel.fa"
+
+human_genome_index = human_genome_file + '.fai'
+
+# Read length for ribodetector
+read_length = config['read_length']
+
+# Fastq Screen config file
+fscreen_config = config['fastq_screen_config']
+
+# Bowtie2 stuff, separated into human and drosophila (dm)
+
+bowtie_suffixes = ["1", "2", "3", "4", "rev.1", "rev.2"]
+bowtie_index_dir = "bowtie_index"
+
+# Define genomes with their specific parameters
+GENOMES = {
+    "human": {
+        "fasta": human_genome_file,
+        "params": "--end-to-end --very-sensitive --no-mixed --no-discordant --phred33 -I 10 -X 700",
+    },
+    "dm": {
+        "fasta": dm_genome_file,
+        "params": "--end-to-end --very-sensitive --no-overlap --no-dovetail --no-mixed --no-discordant --phred33 -I 10 -X 700",
+    },
+}
+
+# Derived index prefixes
+BOWTIE_INDEX_PREFIX = {
+    genome: f"{bowtie_index_dir}/{genome}"
+    for genome in GENOMES
+}
+
+# Derived full index file lists (used in mapping rule input)
+BOWTIE_INDEX_FILES = {
+    genome: expand(
+        BOWTIE_INDEX_PREFIX[genome] + ".{SUF}.bt2",
+        SUF = bowtie_suffixes
+    )
+    for genome in GENOMES
+}
+
+
+# Read samples from a file
+with open(config['samples']) as f:
+    SAMPLES = f.read().splitlines()
+
+PAIRS = ['R1', 'R2']
+
+
+# Lists for rule all
+
+ENVIRONMENT = ['environment.txt', 'spec-file.txt']
+TRIM_COUNTS = expand('fastq_trimmed/{sample}_count.txt', sample = SAMPLES)
+CLEAN_COUNTS = expand('fastq_clean/{sample}_count.txt', sample = SAMPLES)
+CHRSTATS = expand('chrcount/{sample}.txt', sample = SAMPLES)
+QCS = expand('qc/{sample}_{pair}_fastqc.html', sample = SAMPLES, pair = PAIRS)
+FSCREENS = expand('fscreen/{sample}_{pair}_screen.txt', sample = SAMPLES, pair = PAIRS)
+MULTIQC = ['multiqc/report.html']
+BAMS = expand('bam_{genome}/{sample}.bam', sample = SAMPLES, genome = GENOMES.keys())
+BAMS_DEDUP = expand("bam_human/{sample}_dedup.bam", sample = SAMPLES)
+#BAIS = expand('bam/{sample}.bam.bai', sample = SAMPLES)
+
+####################################################################
+
+rule all:
+    input: ENVIRONMENT + QCS + MULTIQC + TRIM_COUNTS + CLEAN_COUNTS + CHRSTATS + BAMS_DEDUP
+    #input: expand("fastq_trimmed/{sample}_{pair}.fastq.gz", sample = SAMPLES, pair = PAIRS) 
+
+####################################################################
+# Save environment
+
+rule environment:
+    output:
+        table = 'environment.txt',
+        spec = 'spec-file.txt'
+    shell:
+       '''
+       mamba list > {output.table}
+       mamba list --explicit > {output.spec}
+       '''
+
+####################################################################
+# Trim adapter sequences.
+
+rule trim_adapters:
+    input:
+        R1 = 'fastq/{sample}_R1.fastq.gz',
+        R2 = 'fastq/{sample}_R2.fastq.gz'
+    output:
+        R1 = 'fastq_trimmed/{sample}_R1.fastq.gz',
+        R2 = 'fastq_trimmed/{sample}_R2.fastq.gz',
+        report = 'fastq_trimmed/{sample}_report.html'
+    threads: 4
+    shell:
+        '''
+        mkdir -p fastq_trimmed
+        mkdir $TMPDIR/fastp
+        fastp -w {threads} -h $TMPDIR/fastp/fastp.html -g --adapter_sequence CTGTCTCTTATA --adapter_sequence_r2 CTGTCTCTTATA -i {input.R1} -I {input.R2} -o $TMPDIR/fastp/R1.gz -O $TMPDIR/fastp/R2.gz
+        mv $TMPDIR/fastp/R1.gz {output.R1}
+        mv $TMPDIR/fastp/R2.gz {output.R2}
+        mv $TMPDIR/fastp/fastp.html {output.report}
+        '''
+
+####################################################################
+# Remove ribosomal sequences
+
+rule clean_ribo:
+    input:
+        R1 = 'fastq_trimmed/{sample}_R1.fastq.gz',
+        R2 = 'fastq_trimmed/{sample}_R2.fastq.gz'
+    output:
+        R1 = 'fastq_clean/{sample}_R1.fastq.gz',
+        R2 = 'fastq_clean/{sample}_R2.fastq.gz'
+    threads: 12
+    shell:
+        '''
+        mkdir -p fastq_clean
+        ribodetector_cpu -t {threads} -l {read_length} -i {input.R1} {input.R2} -e rrna --chunk_size 1024 -o $TMPDIR/ribo.R1.fastq $TMPDIR/ribo.R2.fastq
+        gzip -c $TMPDIR/ribo.R1.fastq > {output.R1}
+        gzip -c $TMPDIR/ribo.R2.fastq > {output.R2}
+        '''
+        
+####################################################################
+# Quality control
+
+rule fastqc:
+    input: 'fastq_trimmed/{prefix}.fastq.gz'
+    output:
+        html = 'qc/{prefix}_fastqc.html',
+        zip = 'qc/{prefix}_fastqc.zip'
+    threads: 2
+    shell:
+        'fastqc -o qc --threads {threads} -f fastq {input}'
+
+####################################################################
+# Fastq Screen
+#   genomes must be installed manually: fastq_screen --get_genomes
+#   and config file prepared
+
+rule fastq_screen:
+    input: 'fastq_trimmed/{prefix}.fastq.gz'
+    output:
+        html = 'fscreen/{prefix}_screen.html',
+        txt = 'fscreen/{prefix}_screen.txt'
+    threads: 12
+    shell:
+        '''
+        fastq_screen --conf {fscreen_config} --outdir $TMPDIR/fscreen --threads {threads} {input}
+        mv $TMPDIR/fscreen/{wildcards.prefix}_screen.html {output.html}
+        mv $TMPDIR/fscreen/{wildcards.prefix}_screen.txt {output.txt}
+        '''
+
+
+####################################################################
+# Final multiqc from fastqc and fast_screen
+
+rule multiqc:
+    input:
+        fscreen = FSCREENS,
+        qc = QCS,
+        trimmed = expand('fastq_trimmed/{sample}_report.html', sample = SAMPLES)
+    output: 'multiqc/report.html'
+    shell:
+        'multiqc -f --filename report --outdir multiqc fastq_trimmed qc fscreen'
+
+####################################################################
+# Count reads
+
+rule count_trimmed:
+    input: 'fastq_trimmed/{sample}_R1.fastq.gz'
+    output: 'fastq_trimmed/{sample}_count.txt'
+    shell:
+        'zcat {input} | echo $((`wc -l`/4)) > {output}'
+
+rule count_clean:
+    input: 'fastq_clean/{sample}_R1.fastq.gz'
+    output: 'fastq_clean/{sample}_count.txt'
+    shell:
+        'zcat {input} | echo $((`wc -l`/4)) > {output}'
+
+
+####################################################################
+# Load genome files
+
+rule load_genome:
+    output: 
+        human = human_genome_file,
+        dm = dm_genome_file
+    shell:
+        '''
+        wget {human_genome_url} -O - | gunzip -c > {output.human}
+        wget {dm_genome_url} -O - | gunzip -c > {output.dm}
+        '''
+
+####################################################################
+# Index genome, create chromosome size file
+
+rule index_genome:
+    input: human_genome_file
+    output: human_genome_index
+    shell:
+        'samtools faidx {input}'
+
+
+####################################################################
+# bowtie
+
+rule build_index:
+    input:
+        lambda wc: GENOMES[wc.genome]["fasta"]
+    output:
+        # Explicit patterns with the {genome} wildcard
+        f"{bowtie_index_dir}/{{genome}}.1.bt2",
+        f"{bowtie_index_dir}/{{genome}}.2.bt2",
+        f"{bowtie_index_dir}/{{genome}}.3.bt2",
+        f"{bowtie_index_dir}/{{genome}}.4.bt2",
+        f"{bowtie_index_dir}/{{genome}}.rev.1.bt2",
+        f"{bowtie_index_dir}/{{genome}}.rev.2.bt2"
+    params:
+        dir    = bowtie_index_dir,
+        prefix = lambda wc: BOWTIE_INDEX_PREFIX[wc.genome]
+    shell:
+        r"""
+        mkdir -p {params.dir}
+        bowtie2-build {input} {params.prefix}
+        """
+
+# Map to either human or dm, depending on {genome} in the output
+rule bowtie_mapping:
+    input:
+        R1  = "fastq_clean/{sample}_R1.fastq.gz",
+        R2  = "fastq_clean/{sample}_R2.fastq.gz",
+        idx = lambda wc: BOWTIE_INDEX_FILES[wc.genome]
+    output:
+        bam     = "bam_{genome}/{sample}.bam",
+        summary = "bam_{genome}/{sample}.summary.txt"
+    threads: 8
+    params:
+        idx_prefix = lambda wc: BOWTIE_INDEX_PREFIX[wc.genome],
+        extra      = lambda wc: GENOMES[wc.genome]["params"],
+        rg         = lambda wc: f"@RG\\tID:Group\\tSM:{wc.sample}\\tPL:Illumina\\tLB:Library.fa"
+    shell:
+        r"""
+        mkdir -p $(dirname {output.bam}) $(dirname {output.summary})
+
+        bowtie2 \
+            -x {params.idx_prefix} \
+            -1 {input.R1} -2 {input.R2} \
+            {params.extra} \
+            -p {threads} \
+        2> {output.summary} \
+        | samtools view -b \
+        | samtools sort -@ {threads} \
+        | samtools addreplacerg -r '{params.rg}' -o {output.bam} -
+        """
+
+####################################################################
+# De-duplicated BAM files
+
+rule picard_dedup:
+    input:
+        "bam_human/{sample}.bam"
+    output:
+        bam     = "bam_human/{sample}_dedup.bam",
+        bai     = "bam_human/{sample}_dedup.bai",
+        metrics = "bam_human/{sample}_dedup.metrics.txt"
+    threads: 4
+    params:
+        # If you only want to *mark* duplicates (not remove), set REMOVE_DUPLICATES=false
+        extra = "-REMOVE_DUPLICATES false -ASSUME_SORTED true -VALIDATION_STRINGENCY SILENT"
+    shell:
+        r"""
+        mkdir -p $TMPDIR/picard
+
+        picard MarkDuplicates \
+            -I {input} \
+            -O {output.bam} \
+            -M {output.metrics} \
+            {params.extra} \
+            -CREATE_INDEX true
+        """
+
+
+
+
+
+####################################################################
+# Counts per chromosome
+
+rule chr_counts:
+    input: 
+      bam = 'bam_human/{sample}_dedup.bam',
+      bai = 'bam_human/{sample}_dedup.bai'
+    output: 'chrcount/{sample}.txt'
+    threads: 8
+    shell:
+        'samtools idxstats {input.bam} > {output}'
+
+####################################################################
+# bedGraph files
+
+

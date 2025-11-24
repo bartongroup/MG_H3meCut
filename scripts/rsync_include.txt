@@ -1,0 +1,15 @@
+info/*
+fastq_trimmed/*.txt
+fastq_clean/*.txt
+fscreen/*.txt
+qc/*.zip
+multiqc/*.html
+bam_dm/*.txt
+bam_human/*.txt
+fastq_screen.conf
+Snakefile
+environment.txt
+config/*
+*.sh
+spec-file.txt
+fastq_files.txt

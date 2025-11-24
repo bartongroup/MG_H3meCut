@@ -1,0 +1,20 @@
+{
+  "species" : "human",
+  "ensembl" : {
+    "biomart" : "ENSEMBL_MART_ENSEMBL",
+    "dataset" : "hsapiens_gene_ensembl",
+    "version" : "115"
+  },
+  "data_path" : "cluster",
+  "yaml_file" : "cluster/config/config.yaml",
+  "metadata_file" : "info/metadata.xlsx",
+  "dir" : {
+    "fastq_trimmed" : "fastq_trimmed",
+    "fastq_clean" : "fastq_clean",
+    "fastq_screen" : "fscreen",
+    "qc" : "qc",
+    "bam_human" : "bam_human",
+    "bam_dm" : "bam_dm"
+  },
+  "sample_file" : "cluster/config/samples.txt"
+}
