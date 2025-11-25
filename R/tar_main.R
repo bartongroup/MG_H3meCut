@@ -12,7 +12,8 @@ targets_main <- function() {
   setup_experiment <- tar_plan(
     tar_target(config_file, "config.json", format = "file"),
     config = jsonlite::read_json(config_file),
-    metadata = read_metadata(config$sample_file)
+    tar_target(sample_file, config$sample_file, format = "file"),
+    metadata = read_metadata(sample_file)
   )
 
   qc <- tar_plan(
@@ -22,17 +23,37 @@ targets_main <- function() {
     fscrn = parse_fscreens(config, metadata),
     qcs = parse_qcs(config, metadata, paired = TRUE),
     idxstats = parse_idxstats(config, metadata),
+    fig_chrom_reads = plot_chrom_proportion(idxstats, c(1:22, "X", "Y", "MT"), per_length = FALSE),
+    fig_mitochondrial_prop = plot_mitochondrial_proportion(idxstats, metadata),
     
     fig_fscreen = plot_fscreen_map(fscrn),
     fig_read_qual = plot_qualities(qcs),
     fig_read_qual_clust = plot_cluster_qualities(qcs),
 
     bowtie_sum_human = read_bowtie_summaries(file.path(config$data_path, config$dir$bam_human), metadata),
-    bowtie_sum_dm = read_bowtie_summaries(file.path(config$data_path, config$dir$bam_dm), metadata)
+    bowtie_sum_dm = read_bowtie_summaries(file.path(config$data_path, config$dir$bam_dm), metadata),
+    bowtie_sum_merged = merge_two_bowtie_summaries(bowtie_sum_human, bowtie_sum_dm),
+    fig_bowtie_sum_human = plot_bowtie_summaries(bowtie_sum_human, metadata),
+    fig_bowtie_sum_dm = plot_bowtie_summaries(bowtie_sum_dm, metadata),
+    fig_spikein_ratios = plot_spikein_ratios(bowtie_sum_merged, metadata),
+
+    picard_dup = read_picard_duplication(file.path(config$data_path, config$dir$bam_human), metadata),
+    fig_picard_dup = plot_picard_duplication(picard_dup, metadata)
+
+  )
+
+
+  get_environment <- tar_plan(
+    tar_target(version_file, file.path(config$data_path, "environment.txt"), format = "file"),
+    software_versions = get_software_versions(
+      version_file,
+      selection = c("fastqc", "fastq-screen", "fastp", "ribodetector", "multiqc", "bowtie2", "samtools", "bedtools", "snakemake", "drmaa", "picard", "macs3")
+    )
   )
 
 
   c(
+    get_environment,
     get_annotations,
     setup_experiment,
     qc

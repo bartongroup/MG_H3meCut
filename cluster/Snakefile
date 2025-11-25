@@ -5,7 +5,7 @@
 #
 # mamba create --name h3mecut
 # mamba activate h3mecut
-# mamba install snakemake=7.32.4 fastqc multiqc samtools bedtools bowtie2 fastp fastq-screen drmaa ribodetector picard macs3
+# mamba install snakemake=7.32.4 fastqc multiqc samtools bedtools bowtie2 fastp fastq-screen drmaa ribodetector picard macs3 qualimap
 #
 ### To recreate the environment
 #
@@ -16,40 +16,38 @@ configfile: 'config/config.yaml'
 
 # Genome file configuration
 
-human_genome_url = "https://ftp.ensembl.org/pub/release-115/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
-dm_genome_url = "https://ftp.ensembl.org/pub/release-115/fasta/drosophila_melanogaster/dna/Drosophila_melanogaster.BDGP6.54.dna.toplevel.fa.gz"
+HUMAN_GENOME_URL = "https://ftp.ensembl.org/pub/release-115/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz"
+DM_GENOME_URL = "https://ftp.ensembl.org/pub/release-115/fasta/drosophila_melanogaster/dna/Drosophila_melanogaster.BDGP6.54.dna.toplevel.fa.gz"
 
-human_genome_file = "genome/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
-dm_genome_file = "genome/Drosophila_melanogaster.BDGP6.54.dna.toplevel.fa"
+HUMAN_GENOME_FILE = "genome/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
+DM_GENOME_FILE = "genome/Drosophila_melanogaster.BDGP6.54.dna.toplevel.fa"
 
-human_genome_index = human_genome_file + '.fai'
-
-# Read length for ribodetector
-read_length = config['read_length']
+HUMAN_GENOME_INDEX = HUMAN_GENOME_FILE + '.fai'
+HUMAN_CHROM_SIZES = "genome/chrom_sizes.txt"
 
 # Fastq Screen config file
-fscreen_config = config['fastq_screen_config']
+FSCREEN_CONFIG = config['fastq_screen_config']
 
 # Bowtie2 stuff, separated into human and drosophila (dm)
 
-bowtie_suffixes = ["1", "2", "3", "4", "rev.1", "rev.2"]
-bowtie_index_dir = "bowtie_index"
+BOWTIE_SUFFIXES = ["1", "2", "3", "4", "rev.1", "rev.2"]
+BOWTIE_INDEX_DIR = "bowtie_index"
 
 # Define genomes with their specific parameters
 GENOMES = {
     "human": {
-        "fasta": human_genome_file,
+        "fasta": HUMAN_GENOME_FILE,
         "params": "--end-to-end --very-sensitive --no-mixed --no-discordant --phred33 -I 10 -X 700",
     },
     "dm": {
-        "fasta": dm_genome_file,
+        "fasta": DM_GENOME_FILE,
         "params": "--end-to-end --very-sensitive --no-overlap --no-dovetail --no-mixed --no-discordant --phred33 -I 10 -X 700",
     },
 }
 
 # Derived index prefixes
 BOWTIE_INDEX_PREFIX = {
-    genome: f"{bowtie_index_dir}/{genome}"
+    genome: f"{BOWTIE_INDEX_DIR}/{genome}"
     for genome in GENOMES
 }
 
@@ -57,37 +55,42 @@ BOWTIE_INDEX_PREFIX = {
 BOWTIE_INDEX_FILES = {
     genome: expand(
         BOWTIE_INDEX_PREFIX[genome] + ".{SUF}.bt2",
-        SUF = bowtie_suffixes
+        SUF = BOWTIE_SUFFIXES
     )
     for genome in GENOMES
 }
 
+# For spike-in normalisation
+SPIKEIN_DEPTH_DIR = "spikein"
+SPIKEIN_TARGET_DEPTH = 10000  # constant to create a scale factor f = 10,000 / spike_in_depth
+
 
 # Read samples from a file
-with open(config['samples']) as f:
+with open(config["samples"]) as f:
     SAMPLES = f.read().splitlines()
 
-PAIRS = ['R1', 'R2']
+PAIRS = ["R1", "R2"]
 
 
 # Lists for rule all
 
-ENVIRONMENT = ['environment.txt', 'spec-file.txt']
-TRIM_COUNTS = expand('fastq_trimmed/{sample}_count.txt', sample = SAMPLES)
-CLEAN_COUNTS = expand('fastq_clean/{sample}_count.txt', sample = SAMPLES)
-CHRSTATS = expand('chrcount/{sample}.txt', sample = SAMPLES)
-QCS = expand('qc/{sample}_{pair}_fastqc.html', sample = SAMPLES, pair = PAIRS)
-FSCREENS = expand('fscreen/{sample}_{pair}_screen.txt', sample = SAMPLES, pair = PAIRS)
-MULTIQC = ['multiqc/report.html']
-BAMS = expand('bam_{genome}/{sample}.bam', sample = SAMPLES, genome = GENOMES.keys())
+ENVIRONMENT = ["environment.txt", "spec-file.txt"]
+TRIM_COUNTS = expand("fastq_trimmed/{sample}_count.txt", sample = SAMPLES)
+CHRSTATS = expand("chrcount/{sample}.txt", sample = SAMPLES)
+QCS = expand("qc/{sample}_{pair}_fastqc.html", sample = SAMPLES, pair = PAIRS)
+FSCREENS = expand("fscreen/{sample}_{pair}_screen.txt", sample = SAMPLES, pair = PAIRS)
+MULTIQC = ["multiqc/report.html"]
+CHRSTATS = expand("chrcount/{sample}.txt", sample = SAMPLES)
+BAMS = expand("bam_{genome}/{sample}.bam", sample = SAMPLES, genome = GENOMES.keys())
 BAMS_DEDUP = expand("bam_human/{sample}_dedup.bam", sample = SAMPLES)
-#BAIS = expand('bam/{sample}.bam.bai', sample = SAMPLES)
+QUALIMAPS = expand("qm_{genome}/{sample}/genome_results.txt", sample = SAMPLES, genome = GENOMES.keys())
+BEDGRAPHS = expand("bedgraph/{sample}.bedgraph", sample = SAMPLES)
 
 ####################################################################
 
 rule all:
-    input: ENVIRONMENT + QCS + MULTIQC + TRIM_COUNTS + CLEAN_COUNTS + CHRSTATS + BAMS_DEDUP
-    #input: expand("fastq_trimmed/{sample}_{pair}.fastq.gz", sample = SAMPLES, pair = PAIRS) 
+    input: ENVIRONMENT + CHRSTATS + QCS + MULTIQC + TRIM_COUNTS + CHRSTATS + BAMS + BAMS_DEDUP + QUALIMAPS
+
 
 ####################################################################
 # Save environment
@@ -125,25 +128,6 @@ rule trim_adapters:
         '''
 
 ####################################################################
-# Remove ribosomal sequences
-
-rule clean_ribo:
-    input:
-        R1 = 'fastq_trimmed/{sample}_R1.fastq.gz',
-        R2 = 'fastq_trimmed/{sample}_R2.fastq.gz'
-    output:
-        R1 = 'fastq_clean/{sample}_R1.fastq.gz',
-        R2 = 'fastq_clean/{sample}_R2.fastq.gz'
-    threads: 12
-    shell:
-        '''
-        mkdir -p fastq_clean
-        ribodetector_cpu -t {threads} -l {read_length} -i {input.R1} {input.R2} -e rrna --chunk_size 1024 -o $TMPDIR/ribo.R1.fastq $TMPDIR/ribo.R2.fastq
-        gzip -c $TMPDIR/ribo.R1.fastq > {output.R1}
-        gzip -c $TMPDIR/ribo.R2.fastq > {output.R2}
-        '''
-        
-####################################################################
 # Quality control
 
 rule fastqc:
@@ -168,11 +152,10 @@ rule fastq_screen:
     threads: 12
     shell:
         '''
-        fastq_screen --conf {fscreen_config} --outdir $TMPDIR/fscreen --threads {threads} {input}
+        fastq_screen --conf {FSCREEN_CONFIG} --outdir $TMPDIR/fscreen --threads {threads} {input}
         mv $TMPDIR/fscreen/{wildcards.prefix}_screen.html {output.html}
         mv $TMPDIR/fscreen/{wildcards.prefix}_screen.txt {output.txt}
         '''
-
 
 ####################################################################
 # Final multiqc from fastqc and fast_screen
@@ -195,35 +178,34 @@ rule count_trimmed:
     shell:
         'zcat {input} | echo $((`wc -l`/4)) > {output}'
 
-rule count_clean:
-    input: 'fastq_clean/{sample}_R1.fastq.gz'
-    output: 'fastq_clean/{sample}_count.txt'
-    shell:
-        'zcat {input} | echo $((`wc -l`/4)) > {output}'
-
-
 ####################################################################
 # Load genome files
 
 rule load_genome:
     output: 
-        human = human_genome_file,
-        dm = dm_genome_file
+        human = HUMAN_GENOME_FILE,
+        dm = DM_GENOME_FILE
     shell:
         '''
-        wget {human_genome_url} -O - | gunzip -c > {output.human}
-        wget {dm_genome_url} -O - | gunzip -c > {output.dm}
+        wget {HUMAN_GENOME_URL} -O - | gunzip -c > {output.human}
+        wget {DM_GENOME_URL} -O - | gunzip -c > {output.dm}
         '''
 
 ####################################################################
 # Index genome, create chromosome size file
 
 rule index_genome:
-    input: human_genome_file
-    output: human_genome_index
+    input: HUMAN_GENOME_FILE
+    output:
+        index = HUMAN_GENOME_INDEX,
+        sizes = HUMAN_CHROM_SIZES
     shell:
-        'samtools faidx {input}'
+        r"""
+        samtools faidx {input}
 
+        # Extract the first two columns (chrom name, length)
+        cut -f1,2 {input}.fai > {output.sizes}
+        """
 
 ####################################################################
 # bowtie
@@ -233,14 +215,14 @@ rule build_index:
         lambda wc: GENOMES[wc.genome]["fasta"]
     output:
         # Explicit patterns with the {genome} wildcard
-        f"{bowtie_index_dir}/{{genome}}.1.bt2",
-        f"{bowtie_index_dir}/{{genome}}.2.bt2",
-        f"{bowtie_index_dir}/{{genome}}.3.bt2",
-        f"{bowtie_index_dir}/{{genome}}.4.bt2",
-        f"{bowtie_index_dir}/{{genome}}.rev.1.bt2",
-        f"{bowtie_index_dir}/{{genome}}.rev.2.bt2"
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.1.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.2.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.3.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.4.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.rev.1.bt2",
+        f"{BOWTIE_INDEX_DIR}/{{genome}}.rev.2.bt2"
     params:
-        dir    = bowtie_index_dir,
+        dir    = BOWTIE_INDEX_DIR,
         prefix = lambda wc: BOWTIE_INDEX_PREFIX[wc.genome]
     shell:
         r"""
@@ -251,8 +233,8 @@ rule build_index:
 # Map to either human or dm, depending on {genome} in the output
 rule bowtie_mapping:
     input:
-        R1  = "fastq_clean/{sample}_R1.fastq.gz",
-        R2  = "fastq_clean/{sample}_R2.fastq.gz",
+        R1  = "fastq_trimmed/{sample}_R1.fastq.gz",
+        R2  = "fastq_trimmed/{sample}_R2.fastq.gz",
         idx = lambda wc: BOWTIE_INDEX_FILES[wc.genome]
     output:
         bam     = "bam_{genome}/{sample}.bam",
@@ -303,23 +285,112 @@ rule picard_dedup:
             -CREATE_INDEX true
         """
 
-
-
-
-
 ####################################################################
 # Counts per chromosome
 
 rule chr_counts:
     input: 
-      bam = 'bam_human/{sample}_dedup.bam',
-      bai = 'bam_human/{sample}_dedup.bai'
+        bam = 'bam_human/{sample}_dedup.bam',
+        bai = 'bam_human/{sample}_dedup.bai'
     output: 'chrcount/{sample}.txt'
     threads: 8
     shell:
         'samtools idxstats {input.bam} > {output}'
 
+
 ####################################################################
-# bedGraph files
+# Index BAM files
 
+rule index_bam:
+    input: 'bam_{genome}/{sample}.bam'
+    output: 'bam_{genome}/{sample}.bam.bai'
+    threads: 8
+    shell:
+        'samtools index {input}'
 
+####################################################################
+# Qualimap
+
+rule qualimap_bamqc:
+    input:
+        bam = 'bam_{genome}/{sample}.bam',
+        bai = 'bam_{genome}/{sample}.bam.bai'
+    output: 'qm_{genome}/{sample}/genome_results.txt'
+    threads: 8
+    params:
+        mem = '24G'
+    shell:
+        '''
+        rm -fR qm_{wildcards.genome}/{wildcards.sample}
+        qualimap bamqc -nt {threads} -bam {input.bam} -outdir qm_{wildcards.genome}/{wildcards.sample} --java-mem-size={params.mem}
+        '''
+
+###################################################################
+# Make BED files
+
+rule make_fragments_bed:
+    input:
+        bam = "bam_human/{sample}.bam"
+    output:
+        bed = "bed/{sample}.bed"
+    shell:
+        r"""
+        mkdir -p $(dirname {output.bed})
+
+        # Convert BAM to BEDPE, then reduce to fragment intervals.
+        # bedtools bamtobed -bedpe columns:
+        # 1:chrom1 2:start1 3:end1 4:chrom2 5:start2 6:end2 7:name 8:score 9:strand1 10:strand2
+        bedtools bamtobed -bedpe -i {input.bam} \
+        | awk 'BEGIN{{OFS="\t"}} $1==$4 {{s=$2; e=$6; if (s>e) {{t=s; s=e; e=t}}; print $1, s, e, $7, $8, "+"}}' \
+        > {output.bed}
+        """
+
+####################################################################
+# Spike-in normalisation
+
+rule spikein_depth:
+    input:
+        bam = "bam_dm/{sample}.bam"
+    output:
+        depth = SPIKEIN_DEPTH_DIR + "/{sample}.spikein_depth.txt",
+        scale = SPIKEIN_DEPTH_DIR + "/{sample}.spikein_scale.txt"
+    shell:
+        r"""
+        mkdir -p {SPIKEIN_DEPTH_DIR}
+
+        # Count aligned reads (exclude unmapped: -F 0x04)
+        total_reads=$(samtools view -F 0x04 {input.bam} | wc -l)
+
+        # Paired-end: each pair contributes 2 records → divide by 2
+        seq_depth=$(( total_reads / 2 ))
+
+        echo "$seq_depth" > {output.depth}
+
+        # Scale factor = target_depth / spikein_depth
+        scale_factor=$(echo "{SPIKEIN_TARGET_DEPTH} / $seq_depth" | bc -l)
+        echo "$scale_factor" > {output.scale}
+        """
+
+####################################################################
+# Create bedgraphs using spike-in normalisation
+
+rule normalize_fragments_bedgraph:
+    input:
+        fragments = "bed/human/{sample}.fragments.bed",
+        scale     = SPIKEIN_DEPTH_DIR + "/{sample}.spikein_scale.txt",
+        chromsizes = HUMAN_CHROM_SIZES
+    output:
+        bg = "bedgraph/{sample}.bedgraph"
+    shell:
+        r"""
+        mkdir -p $(dirname {output.bg})
+
+        scale_factor=$(cat {input.scale})
+
+        bedtools genomecov \
+            -bg \
+            -scale "$scale_factor" \
+            -i {input.fragments} \
+            -g {input.chromsizes} \
+        > {output.bg}
+        """

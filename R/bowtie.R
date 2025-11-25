@@ -38,7 +38,7 @@ merge_two_bowtie_summaries <- function(sum_human, sum_dm) {
       once_perc = 100 * once / total_reads,
       multi_perc = 100 * multi / total_reads
     ) |> 
-    pivot_wider(id_cols = c(total_reads, paired), names_from = species, values_from = c(once, multi, once_perc, multi_perc))
+    pivot_wider(id_cols = c(sample, total_reads, paired), names_from = species, values_from = c(once, multi, once_perc, multi_perc))
 }
 
 plot_bowtie_summaries <- function(bsum, meta) {
@@ -56,14 +56,18 @@ plot_bowtie_summaries <- function(bsum, meta) {
     select(sample, `Total reads (M)`, `% aligned once`, `% aligned multi`) |> 
     pivot_longer(-sample)  |> 
     left_join(meta, by = join_by(sample)) |> 
-  ggplot(aes(x = group, y = value, colour = replicate)) +
+  ggplot(aes(x = group, y = value, fill = replicate)) +
     th +
-    geom_beeswarm(cex = 2) +
-    scale_colour_manual(values = okabe_ito_palette) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    ) +
+    geom_beeswarm(size = 2, cex = 3, shape = 21, colour = "grey50") +
+    scale_fill_manual(values = okabe_ito_palette) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, NA)) +
     facet_wrap(~name, scales = "free_y", ncol = 1)    
 }
 
-read_one_picard_dedup <- function(dfile) {
+read_one_picard_duplication <- function(dfile) {
   r <- read_lines(dfile)
   i0 <- which(str_detect(r, "^LIBRARY"))
   names <- r[i0] |> str_split_1("\\t")
@@ -72,17 +76,17 @@ read_one_picard_dedup <- function(dfile) {
 }
 
 
-read_picard_decup <- function(path, meta) {
+read_picard_duplication <- function(path, meta) {
   map2(meta$raw_sample, meta$sample, function(rsmpl, smpl) {
     f <- file.path(path, str_glue("{rsmpl}_dedup.metrics.txt"))
-    read_one_picard_dedup(f) |> 
+    read_one_picard_duplication(f) |> 
       add_column(sample = smpl)
   }) |> 
     bind_rows()
 }
 
 
-plot_picard_duplication <- function(pd) {
+plot_picard_duplication <- function(pd, meta) {
   pd |> 
     filter(name %in% c("READ_PAIRS_EXAMINED", "ESTIMATED_LIBRARY_SIZE", "PERCENT_DUPLICATION", "READ_PAIR_OPTICAL_DUPLICATES")) |> 
     mutate(value = as.numeric(value)) |> 
@@ -99,10 +103,33 @@ plot_picard_duplication <- function(pd) {
     select(-c(READ_PAIRS_EXAMINED, READ_PAIR_OPTICAL_DUPLICATES)) |> 
     pivot_longer(-sample) |> 
     left_join(meta, by = join_by(sample)) |> 
-  ggplot(aes(x = group, y = value, colour = replicate)) +
+  ggplot(aes(x = group, y = value, fill = replicate)) +
     th +
-    geom_beeswarm(cex = 2) +
-    scale_colour_manual(values = okabe_ito_palette) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    ) +
+    geom_beeswarm(size = 2, cex = 3, shape = 21, colour = "grey50") +
+    scale_fill_manual(values = okabe_ito_palette) +   
+    scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, NA)) +
     facet_wrap(~name, scales = "free_y", ncol = 1)    
+}
 
+
+plot_spikein_ratios <- function(bowtie_sum_merged, meta) {
+  bowtie_sum_merged |> 
+    mutate(
+      all_dp = once_drosophila + multi_drosophila,
+      all_human = once_human + multi_human,
+      dp_prop = 100 * all_dp / (all_dp + all_human)
+    ) |> 
+    left_join(meta, by = join_by(sample)) |> 
+  ggplot(aes(x = group, y = dp_prop, fill = replicate)) +
+    th +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    ) +
+    geom_beeswarm(size = 2, cex = 3, shape = 21, colour = "grey50") +
+    scale_fill_manual(values = okabe_ito_palette) +   
+    scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, NA), trans = "sqrt", breaks = c(1, 2, 5, 10, 20, 40, 60)) +
+    labs(x = "Group", y = "% drosophila hits")
 }

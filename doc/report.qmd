@@ -1,0 +1,399 @@
+---
+title: "H3K9me3 CUT&Tag analysis"
+author:
+  - name: Marek Gierlinski
+    affiliations: Data Analysis Group
+    note: "Creator of this report"
+  - name: Jane Wright
+    affiliations: Genome Integrity
+    note: Proponent
+  - name: Constance Alabert
+    affiliations: MCDB
+    note: PI
+    
+date: today
+date-format: "D MMMM YYYY"
+execute:
+  echo: false
+  cache: true
+  warning: false
+format:
+  html:
+    theme:
+      - journal
+      - report.scss
+    toc: true
+    number-sections: true
+self-contained: true
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+```{r libraries}
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(tidyr)
+  library(dplyr)
+  library(purrr)
+  library(stringr)
+  library(forcats)
+  library(targets)
+  library(gt)
+  library(cowplot)
+})
+tar_config_set(store = "../_targets")
+```
+
+```{r}
+#| label: table-functions
+gt_table <- function(s) {
+  s |> 
+    gt::gt() |> 
+    gt::tab_options(
+      table.align = "center",
+      heading.align = "center",
+      data_row.padding = gt::px(3)
+    ) |> 
+    gt::opt_table_font(
+      font = c(
+        gt::default_fonts()
+      )
+    )
+}
+```
+
+# Proposal
+
+We would like DAG to analyse the H3K9me3 CUT and TAG samples.
+
+## Context: Manuscript in revision
+
+Reviewers asked for:
+
+1. We detect changes in H3K9me3 level (increase upon differentiation) by mass spectrometry. Reviewers ask to discriminate between H3K9me3 genome wide changes and site-specific changes: We did a H3K9me3 CUT & TAG +/- differentiation.
+1. To uncover the role of SETDB1 in H3K9me3 deposition upon differentiation: H3K9me3 CUT & TAG +/-SETDB1 depletion.
+
+## Experimental Design: Samples and Conditions
+
+We are comparing two cell types and two siRNA treatments, yielding four biological conditions:
+
+1.	iPS control
+2.	iPS SETDB1 siRNA
+3.	48-hour PSM differentiated control
+4.	48-hour PSM differentiated SETDB1 siRNA
+
+Each condition includes four biological replicates, so 16 samples in total.
+
+Sequencing depth: CUT&Tag: Paired-end reads, ~8 million reads per sample
+To generate the CUT and TAG DNA libraires we used the kit from [active motif](https://www.activemotif.com/catalog/1395/cut-tag-it-express).
+
+## Drosophila spike in
+
+We have used Drosophila melanogaster nuclei as a heterologous spike-in control that we can use as a reliable normalization strategy. Drosophila spike in is added to all cut and tag replicates. The [Active Motif product](https://www.activemotif.com/catalog/1377/cut-tag-spike-in) was used. 
+
+
+## Timeline
+
+H3K9me3 CUT and Tag samples data available NOW.
+In revision for manuscript so would be good to have results in December.
+Grant must be charged before end of 2025 so need an idea of working hours.
+
+## Biological Questions
+
+1.	Where are H3K9me3 peaks located across the genome in iPSCs and PSM cells?
+2.	Differential analysis: How do these peaks change with differentiation and change with SETDB1 knockdown?
+3.	Since these marks are associated with heterochromatic and repetitive regions, we want to include multi-mapping reads in the analysis to ensure comprehensive detection of repetitive sequences.
+4.	What are the genes and chromatin feature close by to the peaks (within 10kB?). 
+5.	Motif enrichment analysis within the peaks?
+6.	Potentially: correlate ATAC-seq changes with H3K9me3 changes. Are the regions that loose accessibility the ones that gain H3K9me3?
+
+ 
+Data Analysis Plan: Pipeline Overview (I have no experience so just a wild guess)
+1.	Alignment: Align FASTQ reads to the human reference genome using Bowtie2.
+2.	Peak Calling: Identify enriched regions using MACS2.
+3.	Quantification: Generate per-sample peak counts and merge replicates.
+4.	Annotation: Annotate peaks relative to genomic features (e.g., promoters, enhancers, repeats).
+5.	Differential Analysis: Identify condition-specific peaks using DESeq2 or DiffBind.
+6.	Visualization and Interpretation: Perform clustering, PCA, and generate genome browser tracks (e.g., IGV).
+
+## Tools and Environment
+
+Command line 
+RStudio for downstream statistical analysis and visualization
+Key packages: Bowtie2, MACS2, DESeq2, DiffBind, etc…?
+
+Existing data that may be useful to compare to:
+
+A H3K9me3 Cut and TAG paper: Brandon J Park, Shan Hua, Karli D Casler, Eric Cefaloni, Michael C Ayers, Rahiim FLake, Kristin E Murphy, Paula M Vertino, Mitchell R. O’Connell, Patrick J Murphy. bioRxiv 2025.02.03.636299; doi: https://doi.org/10.1101/2025.02.03.636299
+
+A H3K9me3 ChIPseq paper Wang, C., Liu, X., Gao, Y. et al. Reprogramming of H3K9me3-dependent heterochromatin during mammalian embryo development. Nat Cell Biol 20, 620–631 (2018). https://doi.org/10.1038/s41556-018-0093-4
+
+Our own proteomic data: we have whole cell proteomic data for iPS and 48 hour differentiated cells that is included in our manuscript. 
+
+This manuscript has RNA seq data for some similar biological conditions as ours:
+
+Diaz-Cuadros M, Wagner DE, Budjan C, Hubaud A, Tarazona OA, Donelly S, Michaut A, Al Tanoury Z, Yoshioka-Kobayashi K, Niino Y, Kageyama R, Miyawaki A, Touboul J, Pourquié O. In vitro characterization of the human segmentation clock. Nature. 2020 Apr;580(7801):113-118. doi: 10.1038/s41586-019-1885-9. Epub 2020 Jan 8. PMID: 31915384; PMCID: PMC7336868.
+
+This manuscript does ATACseq upon differentiation: Pedro Madrigal, Siwei Deng, Yuliang Feng, Stefania Militi, Kim Jee Goh, Reshma Nibhani, Rodrigo Grandy, Anna Osnato, Daniel Ortmann, Stephanie Brown & Siim Pauklin. Nature Communications volume 14, Article number: 405 (2023)
+
+
+
+# Data analysis
+
+The data analysis was conducted in two stages. The first stage was carried out on the Life Sciences cluster using a Snakemake script. This stage encompassed the cleaning, quality control, and mapping of FASTQ files. The software versions employed in this stage are listed in @sec-cluster-software. In the second stage, the data were imported into [Positron](https://github.com/posit-dev/positron) and further processed using R. The versions of the R packages utilized are detailed in @sec-packages. All code used in this project is available on [GitHub](https://github.com/bartongroup/MG_HippoSeq).
+
+# Design
+
+@tbl-metadata presents the full experimental design. The `Sample` column contains the sample names referenced throughout this report. The Pilot samples were removed from downstream analysis (see below for explanation).
+
+```{r}
+#| label: tbl-metadata
+#| tbl-cap: Design of the experiment.
+tar_read(metadata) |> 
+  select(Experiment = experiment, Sample = sample, `Original sample` = raw_sample, `Time point` = time_point, Treatment = treatment, Group = group, Replicate = replicate) |> 
+  gt_table() |> 
+  cols_align(
+    align = "left",
+    columns = c("Sample", "Original sample", "Group")
+  )
+```
+
+
+# Sequencing and mapping
+
+## Sequencing
+
+Sequencing was done by Novogene. We have received 2x150 bp paired-end reads.
+
+## FastQ screen {#sec-fastq-screen}
+
+[FastQ
+screen](https://www.bioinformatics.babraham.ac.uk/projects/fastq_screen/)
+was used to map a sample of reads to several genomes to check for
+contamination. @fig-fscreen shows one hit one genome percentage. Note,
+the fill scale is logarithmic with grey indicating zero. There is no
+notable contamination from other organisms.
+
+There is, however, a surprisingly large proportion of Drosophila hits from di-methyl samples (Me2). @tbl-fscreen shows the numbers of reads aligned to each genome. *Fastq Screen* maps 100,000 randomly selected reads to each genome. While in tri-methyl samples Drosophila receives ~1000 hits per sample, much less than a typical 40,000-50,000 human hits, in di-methyl samples Drosophila hits are often *much* larger than the human reads, and the drosophila/human ratio of the counts varies dramatically between samples.
+
+```{r}
+#| label: fig-fscreen
+#| fig-cap: Fscreen results, one hit per one genome and multiple hits per one genome are inluded. The colour scale is logarithmic and grey indicates no hits.
+#| fig-width: 6
+#| fig-height: 4
+tar_read(fig_fscreen)
+```
+
+
+
+```{r}
+#| label: tbl-fscreen
+#| tbl-cap: FastQ screen one hit per genome counts. FastQ screen samples 100,000 random reads from each FASTQ file to do the mapping.
+tar_read(fscrn) |>
+  filter( name == "#One_hit_one_genome") |>
+  pivot_wider(id_cols = Genome, names_from = sample, values_from = value) |>
+  arrange(desc(Me2_iPS_Ctrl_1)) |> 
+  gt_table()
+```
+
+## Read quality
+
+@fig-read-qual shows read quality as a function of base pair position,
+@fig-read-qual-clust shows hierarchical clustering based on read
+quality. This has nothing to do with biology, but rather shows potential
+batch effects related to sequencing, e.g. different flow cells,
+different instruments. 
+
+```{r}
+#| label: fig-read-qual
+#| fig-cap: Read quality.
+#| fig-width: 8
+#| fig-height: 3
+tar_read(fig_read_qual) 
+```
+
+```{r}
+#| label: fig-read-qual-clust
+#| fig-cap: Clustering based on read quality.
+#| fig-width: 4
+#| fig-height: 5
+tar_read(fig_read_qual_clust)
+```
+
+## Mapping
+
+```{r}
+#| label: config
+tar_load(config)
+```
+
+[Bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml) was used to map reads to the human GRCh38 and drosophila BDGP6.54 genomes.
+
+Following recommendations from the [CUT&Tag tutorial](https://yezhengstat.github.io/CUTTag_tutorial/#31_Bowtie2_alignment_[required]), the parameters used for the human genome were:
+
+```
+--end-to-end --very-sensitive --no-mixed --no-discordant --phred33 -I 10 -X 700
+```
+
+for the drosophila, two additional parameters were used: `--no-overlap --no-dovetail`.
+
+
+## Mapping properties
+
+@fig-bowtie-sum shows mapping summaries. 
+
+```{r}
+#| label: fig-bowtie-sum
+#| fig-cap: Mapping summaries from bowtie2 for the (A) human and (B) drosophila alignments.
+#| fig-width: 8
+#| fig-height: 6
+pl1 <- tar_read(fig_bowtie_sum_human)
+pl2 <- tar_read(fig_bowtie_sum_dm)
+plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
+## Duplication levels
+
+`picard MarkDuplicates` was used to mark and count duplicates in the BAM files.
+
+```{r}
+#| label: fig-picard-dup
+#| fig-cap: Duplication levels in the human alignments.
+#| fig-width: 4
+#| fig-height: 5
+tar_read(fig_picard_dup)
+```
+
+## Spike-in properties
+
+@sec-fastq-screen showed a large proportion of Drosophila reads in di-methyl samples based on random 100,000 reads. @fig-spikein-ratios shows the percentage of Drosophila mapped reads in all mapped reads. Di-methyl samples contain a lot of Drosophila reads, in some cases there is more Drosophila than human. Also, the percentage of Drosophila varies a lot between replicates.
+
+```{r}
+#| label: fig-spikein-ratios
+#| fig-cap: The percentage of spikein mapped reads (both single- and multi-mapping) in the total mapped reads (both drosophila and human).
+#| fig-width: 4
+#| fig-height: 5
+tar_read(fig_spikein_ratios)
+```
+
+## Read count per chromosome
+
+```{r}
+#| label: fig-chrom-reads
+#| fig-cap: Mapped read count per chromosome for each sample.
+#| fig-width: 8
+#| fig-height: 30
+tar_read(fig_chrom_reads) 
+```
+
+
+## Full QC report
+
+The full quality-control report, based on *FastQC*, *FastQ Screen*,
+*STAR* and *QualiMap*, is available
+[here](https://www.compbio.dundee.ac.uk/user/mgierlinski/hipposeq/rna_seq/multiqc/report.html).
+
+# Read count properties
+
+
+
+
+
+
+
+
+# Resources
+
+## Interactive data explorers {#sec-explorers}
+
+- [Differential expression](https://shiny.compbio.dundee.ac.uk/mgierlinski/private/hipposeq/de)
+- [Gene set enrichment](https://shiny.compbio.dundee.ac.uk/mgierlinski/private/hipposeq/gsea)
+
+## Downloads {#sec-downloads}
+
+- [Differential expression results](https://www.compbio.dundee.ac.uk/user/mgierlinski/hipposeq/tab/de.csv)
+- [Gene set enrichment results](https://www.compbio.dundee.ac.uk/user/mgierlinski/hipposeq/tab/gse.csv)
+
+## Code
+
+All analysis in this report has been done in R. The source code can be
+found on [GitHub](https://github.com/bartongroup/MG_HippoSeq).
+
+
+
+# Session info {#sec-session-info}
+
+```{r}
+#| label: session-info
+#| cache: false
+targets::tar_load(session_info)
+```
+
+```{r}
+#| label: gt_session
+gt_session <- function(s) {
+  s |> 
+    gt::gt() |> 
+    gt::tab_options(
+      table.align = "left",
+      data_row.padding = gt::px(3)
+    ) |> 
+    gt::opt_table_font(
+      font = c(
+        #gt::google_font(name = "Roboto Mono"),
+        gt::default_fonts()
+      )
+    )
+}
+```
+
+
+## Cluster software {#sec-cluster-software}
+
+```{r}
+#| label: cluster-software
+tar_read(software_versions) |> 
+  select(Software = name, Version = version) |> 
+  gt_session() |> 
+  cols_width(
+    Software ~ px(150)
+  ) 
+```
+
+
+## Local platform
+
+```{r}
+#| label: session-info-platform
+#| cache: false
+session_info$platform |>
+  unlist() |>
+  tibble::as_tibble(rownames = "Setting") |> 
+  dplyr::rename(Value = value) |> 
+  gt_session() |> 
+  gt::cols_width(
+    Setting ~ gt::px(150)
+  )
+```
+
+## R packages {#sec-packages}
+
+```{r}
+#| label: session-info-packages
+#| cache: false
+session_info$packages |>
+  tibble::as_tibble() |>
+  dplyr::filter(attached == TRUE) |> 
+  dplyr::select(Package = package, Version = loadedversion, Date = date, Source = source) |> 
+  dplyr::mutate(
+    Source = stringr::str_remove(Source, "\\(.+$"),
+    Source = stringr::str_replace(Source, "Bioconduc~", "Bioconductor")
+  ) |> 
+  gt_session() |> 
+  gt::cols_width(
+    Package ~ gt::px(150),
+    Version ~ gt::px(80),
+    Date ~ gt::px(200)
+  )
+```

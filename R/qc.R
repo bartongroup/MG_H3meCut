@@ -225,16 +225,82 @@ plot_chrom_proportion <- function(ids, chromosomes, per_length = TRUE) {
     ggplot(aes(x = chr, y = count)) +
     theme_bw() +
     theme(
-      panel.grid = element_blank()
+      panel.grid = element_blank(),
+      strip.text = element_text(size = 7)
     ) +
     geom_col() +
-    facet_wrap(~ sample, ncol = 1, scales = "free_y") +
+    facet_wrap(~ sample, ncol = 1, scales = "free_y", strip.position = "right") +
     scale_y_continuous(expand = expansion(mult = c(0, 0.03))) +
     labs(x = "Chromosome", y = ylab)
+}
+
+plot_mitochondrial_proportion <- function(ids, meta) {
+  ids |> 
+    mutate(MT = if_else(chr == "MT", "MT", "not_MT")) |> 
+    group_by(sample, MT) |> 
+    summarise(count = sum(count)) |> 
+    ungroup() |> 
+    pivot_wider(id_cols = sample, names_from = MT, values_from = count) |> 
+    mutate(MT_perc = 100 * MT / (MT + not_MT)) |> 
+    left_join(meta, by = join_by(sample)) |> 
+  ggplot(aes(x = group, y = MT_perc, fill = replicate)) +
+    th +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    ) +
+    geom_beeswarm(size = 2, cex = 3, shape = 21, colour = "grey50") +
+    scale_fill_manual(values = okabe_ito_palette) +   
+    scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, NA), trans = "sqrt", breaks = c(1, 2, 5, 10, 20, 40, 60)) +
+    labs(x = "Group", y = "% mitochondrial reads")
+
 }
 
 get_software_versions <- function(ver_file, selection) {
   read_table(ver_file, col_names = c("name", "version", "hash", "source"), comment = "#", show_col_types = FALSE) |>
     filter(name %in% selection)
+}
+
+
+
+plot_qualities <- function(qc) {
+  qc |> 
+    ggplot(aes(x = Base, y = Mean, group = root, colour = pair)) +
+    theme_bw() +
+    theme(panel.grid = element_blank()) +
+    geom_line(alpha = 0.3, linewidth = 0.6) +
+    scale_colour_manual(values = okabe_ito_palette) +
+    labs(x = "Base", y = "Mean quality score")
+}
+
+plot_cluster_qualities <- function(qc, text.size = 10) {
+  tab <- qc |> 
+    pivot_wider(id_cols = c(pair, Base), names_from = sample, values_from = Mean) |> 
+    select(-c(pair, Base)) |> 
+    as.matrix()
+  
+  hc <- t(tab) |> 
+    dist() |> 
+    hclust()
+  
+  dendr <- ggdendro::dendro_data(hc)
+  seg <- ggdendro::segment(dendr)
+  theme.d <- ggplot2::theme(
+    panel.grid.major = ggplot2::element_blank(),
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.background = ggplot2::element_blank(),
+    axis.text.y = ggplot2::element_text(size = text.size),
+    axis.line.y = ggplot2::element_blank(),
+    axis.line.x = ggplot2::element_line(linewidth = 0.5),
+    axis.ticks.y = ggplot2::element_blank()
+  )
+  ggplot() +
+    theme.d +
+    coord_flip() +
+    geom_segment(data = seg, aes(x = x, y = y, xend = xend, yend = yend)) +
+    scale_x_continuous(breaks = seq_along(dendr$labels$label), labels = dendr$labels$label) +
+    scale_y_continuous(expand = c(0,0), limits = c(0, max(seg$y) * 1.03)) +
+    scale_colour_manual(values = okabe_ito_palette) +
+    labs(x = NULL, y = "Distance")
+  
 }
 

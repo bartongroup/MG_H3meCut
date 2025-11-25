@@ -2,10 +2,13 @@ info/*
 fastq_trimmed/*.txt
 fastq_clean/*.txt
 fscreen/*.txt
+chrcount/*
 qc/*.zip
 multiqc/*.html
 bam_dm/*.txt
 bam_human/*.txt
+qm_human/**
+qm_dm/**
 fastq_screen.conf
 Snakefile
 environment.txt

@@ -12,6 +12,7 @@
     "fastq_trimmed" : "fastq_trimmed",
     "fastq_clean" : "fastq_clean",
     "fastq_screen" : "fscreen",
+    "chr_count" : "chrcount",
     "qc" : "qc",
     "bam_human" : "bam_human",
     "bam_dm" : "bam_dm"
