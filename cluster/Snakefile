@@ -5,7 +5,7 @@
 #
 # mamba create --name h3mecut
 # mamba activate h3mecut
-# mamba install snakemake=7.32.4 fastqc multiqc samtools bedtools bowtie2 fastp fastq-screen drmaa ribodetector picard macs3 qualimap
+# mamba install snakemake=7.32.4 fastqc multiqc samtools bedtools bc bowtie2 fastp fastq-screen drmaa ribodetector picard macs3 qualimap ucsc-bedgraphtobigwig
 #
 ### To recreate the environment
 #
@@ -22,7 +22,12 @@ DM_GENOME_URL = "https://ftp.ensembl.org/pub/release-115/fasta/drosophila_melano
 HUMAN_GENOME_FILE = "genome/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
 DM_GENOME_FILE = "genome/Drosophila_melanogaster.BDGP6.54.dna.toplevel.fa"
 
-HUMAN_GENOME_INDEX = HUMAN_GENOME_FILE + '.fai'
+CANONICAL_CHROMS = [str(i) for i in range(1, 23)] + ["X", "Y", "MT"]
+NUCLEAR_CHROMS = [str(i) for i in range(1, 23)] + ["X", "Y"]
+
+HUMAN_CANONICAL_FILE = "genome/Homo_sapiens.canonical.fa"
+
+HUMAN_GENOME_INDEX = HUMAN_CANONICAL_FILE + '.fai'
 HUMAN_CHROM_SIZES = "genome/chrom_sizes.txt"
 
 # Fastq Screen config file
@@ -35,9 +40,13 @@ BOWTIE_INDEX_DIR = "bowtie_index"
 
 # Define genomes with their specific parameters
 GENOMES = {
-    "human": {
-        "fasta": HUMAN_GENOME_FILE,
+    "human_one": {
+        "fasta": HUMAN_CANONICAL_FILE,
         "params": "--end-to-end --very-sensitive --no-mixed --no-discordant --phred33 -I 10 -X 700",
+    },
+    "human": {
+        "fasta": HUMAN_CANONICAL_FILE,
+        "params": "--end-to-end --very-sensitive --no-mixed --no-discordant --phred33 -I 10 -X 700 -k 10",
     },
     "dm": {
         "fasta": DM_GENOME_FILE,
@@ -61,13 +70,32 @@ BOWTIE_INDEX_FILES = {
 }
 
 # For spike-in normalisation
-SPIKEIN_DEPTH_DIR = "spikein"
-SPIKEIN_TARGET_DEPTH = 10000  # constant to create a scale factor f = 10,000 / spike_in_depth
+SPIKEIN_TARGET_DEPTH = 100000  # constant to create a scale factor f = 100,000 / spike_in_depth
 
 
 # Read samples from a file
+# I know, this should be done below in groupings, 
+# the only reason I keep this from the previous version
+# is to avoid dre-running all the rules when I added groupings later.
 with open(config["samples"]) as f:
     SAMPLES = f.read().splitlines()
+
+
+# Read groupings from a CSV file. For BAM merging.
+import csv
+
+GROUPS = set()
+GROUP_TO_SAMPLES = {}
+
+with open(config["sample_groups"]) as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        s = row["sample"]
+        g = row["group"]
+        GROUPS.add(g)
+        GROUP_TO_SAMPLES.setdefault(g, []).append(s)
+
+GROUPS = sorted(GROUPS)
 
 PAIRS = ["R1", "R2"]
 
@@ -85,12 +113,16 @@ BAMS = expand("bam_{genome}/{sample}.bam", sample = SAMPLES, genome = GENOMES.ke
 BAMS_DEDUP = expand("bam_human/{sample}_dedup.bam", sample = SAMPLES)
 QUALIMAPS = expand("qm_{genome}/{sample}/genome_results.txt", sample = SAMPLES, genome = GENOMES.keys())
 BEDGRAPHS = expand("bedgraph/{sample}.bedgraph", sample = SAMPLES)
+BIGWIGS = expand("bigwig/{sample}.bw", sample = SAMPLES)
+MACS3_BROAD_PEAKS = expand("macs3/broad/{sample}_peaks.broadPeak", sample = SAMPLES)
+MACS3_NARROW_PEAKS = expand("macs3/narrow/{sample}_peaks.narrowPeak", sample = SAMPLES)
+MERGED_BAMS = expand("bam_human/{group}.merged.bam", group = GROUPS)
+
 
 ####################################################################
 
 rule all:
-    input: ENVIRONMENT + CHRSTATS + QCS + MULTIQC + TRIM_COUNTS + CHRSTATS + BAMS + BAMS_DEDUP + QUALIMAPS
-
+   input: ENVIRONMENT + CHRSTATS + MULTIQC + TRIM_COUNTS + CHRSTATS + QUALIMAPS + MACS3_BROAD_PEAKS + MACS3_NARROW_PEAKS
 
 ####################################################################
 # Save environment
@@ -191,11 +223,21 @@ rule load_genome:
         wget {DM_GENOME_URL} -O - | gunzip -c > {output.dm}
         '''
 
-####################################################################
-# Index genome, create chromosome size file
+rule human_canonical_fasta:
+    input: HUMAN_GENOME_FILE
+    output: HUMAN_CANONICAL_FILE
+    params: 
+        chroms = " ".join(CANONICAL_CHROMS)
+    shell:
+        r"""
+        # Index if needed, then extract only the canonical chromosomes
+        samtools faidx {input}
+        samtools faidx {input} {params.chroms} > {output}
+        """
+
 
 rule index_genome:
-    input: HUMAN_GENOME_FILE
+    input: HUMAN_CANONICAL_FILE
     output:
         index = HUMAN_GENOME_INDEX,
         sizes = HUMAN_CHROM_SIZES
@@ -271,7 +313,6 @@ rule picard_dedup:
         metrics = "bam_human/{sample}_dedup.metrics.txt"
     threads: 4
     params:
-        # If you only want to *mark* duplicates (not remove), set REMOVE_DUPLICATES=false
         extra = "-REMOVE_DUPLICATES false -ASSUME_SORTED true -VALIDATION_STRINGENCY SILENT"
     shell:
         r"""
@@ -326,23 +367,79 @@ rule qualimap_bamqc:
         '''
 
 ###################################################################
+# Remove mitochondrial hits
+
+rule filter_mito_bam:
+    input:
+        bam = "bam_human/{sample}_dedup.bam"
+    output:
+        bam = "bam_human/{sample}.noMT.bam",
+        bai = "bam_human/{sample}.noMT.bam.bai"
+    params:
+        chroms = " ".join(NUCLEAR_CHROMS)
+    shell:
+        r"""
+        samtools view -b {input.bam} {params.chroms} > {output.bam}
+        samtools index {output.bam}
+        """
+
+###################################################################
+# Merge BAM replicates
+
+rule merge_bam_replicates:
+    input:
+        lambda wildcards: expand(
+            "bam_human/{sample}.noMT.bam",
+            sample=GROUP_TO_SAMPLES[wildcards.group]
+        )
+    output:
+        bam = "bam_human/{group}.merged.bam",
+        bai = "bam_human/{group}.merged.bam.bai"
+    threads: 8
+    shell:
+        r"""
+        samtools merge -@ {threads} {output.bam} {input}
+        samtools index {output.bam}
+        """
+
+
+
+###################################################################
 # Make BED files
 
 rule make_fragments_bed:
     input:
-        bam = "bam_human/{sample}.bam"
+        bam = "bam_human/{sample}.noMT.bam"
     output:
         bed = "bed/{sample}.bed"
+    threads: 8
+    log:
+        "logs/make_fragments_bed/{sample}.log"
     shell:
         r"""
-        mkdir -p $(dirname {output.bed})
+        (
+          mkdir -p $(dirname {output.bed})
 
-        # Convert BAM to BEDPE, then reduce to fragment intervals.
-        # bedtools bamtobed -bedpe columns:
-        # 1:chrom1 2:start1 3:end1 4:chrom2 5:start2 6:end2 7:name 8:score 9:strand1 10:strand2
-        bedtools bamtobed -bedpe -i {input.bam} \
-        | awk 'BEGIN{{OFS="\t"}} $1==$4 {{s=$2; e=$6; if (s>e) {{t=s; s=e; e=t}}; print $1, s, e, $7, $8, "+"}}' \
-        > {output.bed}
+          # Keep the read pairs that are on the same chromosome and fragment length less than 1000bp.
+          # Only extract the fragment related columns 
+          samtools sort -n -@ {threads} {input.bam}  \
+          | bedtools bamtobed -bedpe -i stdin \
+          | awk '$1==$4 && $6-$2 < 1000 {{print $0}}' \
+          | cut -f 1,2,6 - \
+          | sort -k1,1 -k2,2n -k3,3n \
+          > {output.bed}
+          
+          # ChatGPT stuff:
+          # Name-sort on the fly, convert BAM to BEDPE, then reduce to fragment intervals.
+          # bedtools bamtobed -bedpe columns:
+          # 1:chrom1 2:start1 3:end1 4:chrom2 5:start2 6:end2 7:name 8:score 9:strand1 10:strand2
+
+          # samtools sort -n -@ {threads} {input.bam}  \
+          # | bedtools bamtobed -bedpe -i stdin \
+          # | awk 'BEGIN{{OFS="\t"}} $1==$4 {{s=$2; e=$6; if (s>e) {{t=s; s=e; e=t}}; print $1, s, e, $7, $8, "+"}}' \
+          # | sort -k1,1 -k2,2n -k3,3n \
+          # > {output.bed}
+        ) &> {log}
         """
 
 ####################################################################
@@ -352,11 +449,11 @@ rule spikein_depth:
     input:
         bam = "bam_dm/{sample}.bam"
     output:
-        depth = SPIKEIN_DEPTH_DIR + "/{sample}.spikein_depth.txt",
-        scale = SPIKEIN_DEPTH_DIR + "/{sample}.spikein_scale.txt"
+        depth = "spikein/{sample}.spikein_depth.txt",
+        scale = "spikein/{sample}.spikein_scale.txt"
     shell:
         r"""
-        mkdir -p {SPIKEIN_DEPTH_DIR}
+        mkdir -p spikein
 
         # Count aligned reads (exclude unmapped: -F 0x04)
         total_reads=$(samtools view -F 0x04 {input.bam} | wc -l)
@@ -376,21 +473,133 @@ rule spikein_depth:
 
 rule normalize_fragments_bedgraph:
     input:
-        fragments = "bed/human/{sample}.fragments.bed",
-        scale     = SPIKEIN_DEPTH_DIR + "/{sample}.spikein_scale.txt",
+        fragments = "bed/{sample}.bed",
+        scale     = "spikein/{sample}.spikein_scale.txt",
         chromsizes = HUMAN_CHROM_SIZES
     output:
         bg = "bedgraph/{sample}.bedgraph"
+    log:
+        "logs/normalize_fragments_bedgraph/{sample}.log"    
     shell:
         r"""
-        mkdir -p $(dirname {output.bg})
+        (
+          mkdir -p $(dirname {output.bg})
 
-        scale_factor=$(cat {input.scale})
+          scale_factor=$(cat {input.scale})
 
-        bedtools genomecov \
+          bedtools genomecov \
             -bg \
             -scale "$scale_factor" \
             -i {input.fragments} \
             -g {input.chromsizes} \
-        > {output.bg}
+          | sort -k1,1 -k2,2n \
+          > {output.bg}
+        ) &> {log}
+        """
+
+####################################################################
+# Create bigWigs from bedGraphs
+
+rule make_bigwigs:
+    input: 
+        bg = "bedgraph/{sample}.bedgraph",
+        chromsizes = HUMAN_CHROM_SIZES
+    output:
+        bw = "bigwig/{sample}.bw"
+    log:
+        "logs/make_bigwigs/{sample}.log"    
+    shell:
+        r"""
+        (
+          mkdir -p bigiwg
+
+          bedGraphToBigWig {input.bg} {input.chromsizes} {output.bw}
+        ) &> {log}
+        """
+
+####################################################################
+# MACS3 peak calling on normalised bedgraphs
+# NOT USED
+
+rule macs3_bdgpeakcall:
+    input:
+        bg = "bedgraph/{sample}.bedgraph"
+    output:
+        peaks = "macs3_spike/{sample}_peaks.bed"
+    params:
+        cutoff  = 1.0,          # score cutoff on the 4th column of our bedGraph
+        minlen  = 200,          # minimum peak length (bp)
+        maxgap  = 30,           # max gap allowed within a peak
+        outdir  = "macs3_spike"
+    shell:
+        r"""
+        mkdir -p {params.outdir}
+
+        macs3 bdgpeakcall \
+            -i {input.bg} \
+            -c {params.cutoff} \
+            -l {params.minlen} \
+            -g {params.maxgap} \
+            --outdir {params.outdir} \
+            -o {wildcards.sample}_peaks.bed
+        """
+
+####################################################################
+# MACS3 peak calling on BAM files
+
+
+rule macs3_callpeak_broad:
+    input:
+        bam = "bam_human/{sample}.noMT.bam" 
+    output:
+        broadpeak  = "macs3/broad/{sample}_peaks.broadPeak",
+        gappedpeak = "macs3/broad/{sample}_peaks.gappedPeak",
+        xls        = "macs3/broad/{sample}_peaks.xls"
+    params:
+        outdir = "macs3/broad",
+        name   = "{sample}",
+        genome = "hs",   
+        extra  = "--keep-dup all --nolambda --nomodel --broad -q 0.01 --broad-cutoff 0.01"
+    threads: 8
+    log:
+        "logs/macs3_broad/{sample}.log"
+    shell:
+        r"""
+        mkdir -p {params.outdir}
+
+        macs3 callpeak \
+            -t {input.bam} \
+            -f BAMPE \
+            -g {params.genome} \
+            {params.extra} \
+            -n {params.name} \
+            --outdir {params.outdir} &> {log}
+        """
+
+rule macs3_callpeak_narrow:
+    input:
+        bam = "bam_human/{sample}.noMT.bam" 
+    output:
+        narrowpeak = "macs3/narrow/{sample}_peaks.narrowPeak",
+        bed        = "macs3/narrow/{sample}_summits.bed",
+        xls        = "macs3/narrow/{sample}_peaks.xls"
+    params:
+        outdir = "macs3/narrow",
+        name   = "{sample}",
+        genome = "hs",   
+        extra  = "--keep-dup all --nolambda --nomodel -q 0.01"
+    threads: 8
+    log:
+        "logs/macs3_narrow/{sample}.log"
+    shell:
+        r"""
+        mkdir -p {params.outdir}
+
+        macs3 callpeak \
+            -t {input.bam} \
+            -f BAMPE \
+            -g {params.genome} \
+            {params.extra} \
+            -n {params.name} \
+            --outdir {params.outdir} &> {log}
         """

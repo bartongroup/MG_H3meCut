@@ -6,16 +6,22 @@
     "version" : "115"
   },
   "data_path" : "cluster",
+  "remote_path" : "/Volumes/mgierlinski/projects/h3mecut/",
   "yaml_file" : "cluster/config/config.yaml",
   "metadata_file" : "info/metadata.xlsx",
   "dir" : {
+    "genome" : "genome",
     "fastq_trimmed" : "fastq_trimmed",
     "fastq_clean" : "fastq_clean",
     "fastq_screen" : "fscreen",
     "chr_count" : "chrcount",
     "qc" : "qc",
-    "bam_human" : "bam_human",
-    "bam_dm" : "bam_dm"
+    "bam" : "bam_human",
+    "bam_dm" : "bam_dm",
+    "spike_norm" : "spikein",
+    "bigwig" : "bigwig",
+    "macs_broad" : "macs3/broad",
+    "macs_narrow" : "macs3/narrow"
   },
   "sample_file" : "cluster/config/samples.txt"
 }

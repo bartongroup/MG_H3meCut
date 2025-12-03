@@ -21,7 +21,7 @@ scientific_10 <- function(v, limit = 3.01) {
 
 
 gs <- function(gg, name, width, height) {
-  ggplot2::ggsave(filename = file.path("fig", paste0(name, ".png")), plot = gg, device = "png",
+  ggplot2::ggsave(filename = file.path("doc/images", paste0(name, ".png")), plot = gg, device = "png",
          width = width, height = height, dpi = 300, limitsize = FALSE)
 }
 

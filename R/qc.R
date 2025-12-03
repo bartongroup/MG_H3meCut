@@ -304,3 +304,39 @@ plot_cluster_qualities <- function(qc, text.size = 10) {
   
 }
 
+
+read_spikein_norms <- function(config, meta) {
+  path <- file.path(config$data_path, config$dir$spike_norm)
+
+  map2(meta$sample, meta$raw_sample, function(smpl, rsmpl) {
+    scale_file = file.path(path, str_glue("{rsmpl}.spikein_scale.txt"))
+    depth_file = file.path(path, str_glue("{rsmpl}.spikein_depth.txt"))
+    tibble(
+      sample = smpl,
+      depth = read_lines(depth_file) |> as.numeric(),
+      scale = read_lines(scale_file) |> as.numeric()
+    ) 
+  }) |> 
+  list_rbind()
+}
+
+plot_spikein_norms <- function(sn, meta) {
+  sn |> 
+    mutate(depth = depth / 1e3) |> 
+    rename(
+      `Sequencing depth (x1000)` = depth,
+      `Scaling factor` = scale
+    ) |> 
+    pivot_longer(-sample) |> 
+    left_join(meta, by = join_by(sample)) |> 
+    ggplot(aes(x = group, y = value, fill = replicate)) +
+    th +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    ) +
+    geom_beeswarm(size = 2, cex = 3, shape = 21, colour = "grey50") +
+    scale_fill_manual(values = okabe_ito_palette) +   
+    facet_wrap(~name, scales = "free_y") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, NA)) +
+    labs(x = "Group", y = "Value")
+}

@@ -14,4 +14,4 @@ reference:
     dm_suffix: .dna.toplevel.fa
 
 samples: config/samples.txt
- 
+sample_groups: config/groups.csv 

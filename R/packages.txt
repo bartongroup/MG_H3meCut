@@ -8,3 +8,4 @@ GenomicRanges
 ggbeeswarm
 cowplot
 broom
+rtracklayer

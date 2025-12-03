@@ -19,9 +19,12 @@ read_one_bowtie_summary <- function(sfile) {
 }
 
 
-read_bowtie_summaries <- function(path, meta) {
+read_bowtie_summaries <- function(config, meta, bam_dir = NULL) {
+  if(is.null(bam_dir)) {
+    bam_dir <- config$dir$bam
+  }
   map2(meta$raw_sample, meta$sample, function(rsmpl, smpl) {
-    f <- file.path(path, str_glue("{rsmpl}.summary.txt"))
+    f <- file.path(config$data_path, bam_dir, str_glue("{rsmpl}.summary.txt"))
     read_one_bowtie_summary(f) |> 
       add_column(sample = smpl)
   }) |> 
@@ -76,9 +79,9 @@ read_one_picard_duplication <- function(dfile) {
 }
 
 
-read_picard_duplication <- function(path, meta) {
+read_picard_duplication <- function(config, meta) {
   map2(meta$raw_sample, meta$sample, function(rsmpl, smpl) {
-    f <- file.path(path, str_glue("{rsmpl}_dedup.metrics.txt"))
+    f <- file.path(config$data_path, config$dir$bam, str_glue("{rsmpl}_dedup.metrics.txt"))
     read_one_picard_duplication(f) |> 
       add_column(sample = smpl)
   }) |> 
