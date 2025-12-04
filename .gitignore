@@ -22,3 +22,6 @@ shiny/de_operons/data
 shiny/browser/data
 fig/
 snakejob*
+Rplots.pdf
+cache/*
+diffbind*csv

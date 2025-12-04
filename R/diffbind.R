@@ -103,7 +103,7 @@ de_full_model <- function(dbc) {
   dbc <- DiffBind::dba.contrast(dbc, contrast = c("Tissue", "iPS", "48h"))
   dbc <- DiffBind::dba.contrast(dbc, contrast = c("Treatment", "Ctrl", "SETDB1"))
   dbc <- DiffBind::dba.contrast(dbc, design = "~ Tissue + Treatment")
-  DiffBind::dba.analyze(dbc)
+  DiffBind::dba.analyze(dbc, bBlacklist = FALSE, bGreylist = FALSE)
 }
 
 de_groups <- function(dbc) {
@@ -113,7 +113,7 @@ de_groups <- function(dbc) {
   dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_SETDB1", "48h_Ctrl"))
   dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_SETDB1", "48h_SETDB1"))
   dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "48h_Ctrl", "48h_SETDB1"))
-  DiffBind::dba.analyze(dbc)
+  DiffBind::dba.analyze(dbc, bBlacklist = FALSE, bGreylist = FALSE)
 }
 
 extract_de_results <- function(dbc) {
