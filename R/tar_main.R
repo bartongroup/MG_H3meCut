@@ -42,7 +42,7 @@ targets_main <- function() {
     fig_picard_dup = plot_picard_duplication(picard_dup, metadata),
 
     spikein_norms = read_spikein_norms(config, metadata),
-    fig_spikein_norms = plot_spikein_norms(spikein_norms |> dplyr::filter(str_detect(sample, "Me3")), metadata) 
+    fig_spikein_norms = plot_spikein_norms(spikein_norms |> dplyr::filter(stringr::str_detect(sample, "Me3")), metadata) 
   )
 
   read_data <- tar_plan(
@@ -50,6 +50,32 @@ targets_main <- function() {
     peaks_broad = read_peak_files(config, metadata, format = "broad"),
     peaks_narrow = read_peak_files(config, metadata, format = "narrow")
   )
+
+  map_diffbind <- tar_map(
+    values = tibble::tibble(TYPE = c("broad", "narrow")),
+    names = TYPE,
+
+    tar_plan(
+      meta_db = make_diffbind_metadata(metadata, config, type = TYPE, expm = "Me3"),
+      sav_meta_db = make_diffbind_metadata_for_cluster(metadata, config, type = TYPE, expm = "Me3"),
+      # These steps are very slow, so we cache the result
+      # db = read_and_count_diffbind(meta_db, min_overlap = 2),
+      # db_spike = spikein_normalization(dbc),
+      db = read_correct_cache(TYPE, spike = FALSE),
+      db_spike = read_correct_cache(TYPE, spike = TRUE),
+
+      dbc_full = de_full_model(db_spike),
+      dbc_groups = de_groups(db_spike),
+
+      dec_full = extract_de_results(dbc_full),
+      dec_groups = extract_de_results(dbc_groups)
+
+    )
+
+
+  )
+
+ 
 
   for_report <- tar_plan(
     png_peaks_broad_ctrl = plot_peak_distribution_sample(peaks_broad, "Me3_iPS_Ctrl_1", chrom_sizes, bar_size = 1) |> gs("peaks_broad_dist_ctrl", width = 8, height = 8),
@@ -73,8 +99,9 @@ targets_main <- function() {
     get_environment,
     get_annotations,
     setup_experiment,
-    read_data,
     qc,
+    read_data,
+    map_diffbind,
     for_report
   )
   

@@ -1,3 +1,14 @@
+#!/usr/bin/env Rscript
+
+# usage:
+# diffbind_count_cluster.R diffbind_metadata.csv broad
+
+args = commandArgs(trailingOnly = TRUE)
+stopifnot(length(args) == 2)
+
+in_file <- args[1]
+type <- args[2]
+
 library(DiffBind)
 
 read_and_count_diffbind <- function(meta_db, min_overlap = 2) {
@@ -34,7 +45,15 @@ read_and_count_diffbind <- function(meta_db, min_overlap = 2) {
   db
 }
 
+spikein_normalization <- function(dbc) {
+  DiffBind::dba.normalize(dbc, normalize = DiffBind::DBA_NORM_LIB, spikein = TRUE)
+}
 
-meta <- read.csv("diffbind_metadata.csv")
-db <- read_and_count_diffbind(meta, min_overlap = 2)
-saveRDS(db, file = "diffbind_counted.rds")
+
+meta <- read.csv(in_file)
+
+dbc <- read_and_count_diffbind(meta, min_overlap = 2)
+saveRDS(dbc, file = paste0("dbc_", type, ".rds"))
+
+dbs <- spikein_normalization(dbc)
+saveRDS(dbs, file = paste0("dbc_", type, "_spike.rds"))

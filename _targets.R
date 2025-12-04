@@ -9,7 +9,7 @@ tar_option_set(packages = required_packages, format = "qs")
 options(tidyverse.quiet = TRUE, dplyr.summarise.inform = FALSE)
 
 # Create dirs if necessary
-for (d in c("tab", "fig", "doc", "doc/images")) if (!dir.exists(d)) dir.create(d)
+for (d in c("tab", "fig", "doc", "doc/images", "cache")) if (!dir.exists(d)) dir.create(d)
 
 # For interactive session only
 if (interactive()) sapply(required_packages, library, character.only = TRUE)

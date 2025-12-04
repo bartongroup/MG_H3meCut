@@ -14,7 +14,7 @@ make_diffbind_metadata <- function(meta, config, type = "broad", expm = "Me3") {
       SampleID = sample,
       Tissue = time_point,
       Factor = "H3K9me3",
-      Condition = group,
+      Condition = group |> str_remove("^Me._"),
       Treatment = treatment,
       Replicate = replicate,
       bamReads = file.path(config$remote_path, config$dir$bam, str_glue("{raw_sample}.noMT.bam")),
@@ -28,7 +28,7 @@ make_diffbind_metadata <- function(meta, config, type = "broad", expm = "Me3") {
 make_diffbind_metadata_for_cluster <-  function(meta, config, type = "broad", expm = "Me3") {
   config$remote_path <- "."
   make_diffbind_metadata(meta, config, type, expm) |> 
-    write_csv("diffbind_metadata.csv")
+    write_csv(str_glue("diffbind_metadata_{type}.csv"))
 }
 
 read_and_count_diffbind <- function(meta_db, min_overlap = 2) {
@@ -60,8 +60,88 @@ read_and_count_diffbind <- function(meta_db, min_overlap = 2) {
     summits = FALSE,
     bRemoveDuplicates = FALSE,
     bUseSummarizeOverlaps = TRUE,
-    bParallel = FALSE
+    bParallel = FALSE  # alas, parallel keep crashing
   )
   db
 }
 
+spikein_normalization <- function(dbc) {
+  DiffBind::dba.normalize(dbc, normalize = DiffBind::DBA_NORM_LIB, spikein = TRUE)
+}
+
+libsize_normalization <- function(dbc) {
+  DiffBind::dba.normalize(dbc, normalize = DiffBind::DBA_NORM_LIB)
+}
+
+
+# Need spike-in normalized data (slow process)
+# Default libsize normalization is calculated on the fly
+get_norm_factors <- function(dbcs) {
+  
+  samples <- DiffBind::dba.show(dbcs)$ID
+
+  nsp <- DiffBind::dba.normalize(dbcs, bRetrieve = TRUE)
+  spikein_lib_sizes <- nsp$lib.sizes
+  spikein_norm_factors <- nsp$norm.factors
+
+  dbc <- DiffBind::dba.normalize(dbcs, normalize = DiffBind::DBA_NORM_LIB)
+  nf <- DiffBind::dba.normalize(dbc, bRetrieve = TRUE)
+  lib_sizes <- nf$lib.sizes
+  norm_factors <- nf$norm.factors
+
+  tibble(
+    sample = samples,
+    spikein_lib_size = spikein_lib_sizes,
+    spikein_norm_factor = spikein_norm_factors,
+    lib_size = lib_sizes,
+    norm_factor = norm_factors
+  )
+}
+
+
+de_full_model <- function(dbc) {
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Tissue", "iPS", "48h"))
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Treatment", "Ctrl", "SETDB1"))
+  dbc <- DiffBind::dba.contrast(dbc, design = "~ Tissue + Treatment")
+  DiffBind::dba.analyze(dbc)
+}
+
+de_groups <- function(dbc) {
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_Ctrl", "iPS_SETDB1"))
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_Ctrl", "48h_Ctrl"))
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_Ctrl", "48h_SETDB1"))
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_SETDB1", "48h_Ctrl"))
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_SETDB1", "48h_SETDB1"))
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "48h_Ctrl", "48h_SETDB1"))
+  DiffBind::dba.analyze(dbc)
+}
+
+extract_de_results <- function(dbc) {
+  contrasts <- DiffBind::dba.show(dbc, bContrasts = TRUE) |> 
+    as_tibble() |> 
+    mutate(contrast = str_glue("{Group2}-{Group}"))
+  map(1:nrow(contrasts), function(i) {
+    contrast_name <- contrasts$contrast[i]
+    DiffBind::dba.report(dbc, contrast = i, th = 1) |> 
+      as_tibble() |> 
+      rename(conc_1 = 7, conc2 = 8) |> 
+      mutate(contrast = contrast_name)
+  }) |> 
+    bind_rows() |> 
+    rename(
+      chr = seqnames,
+      conc = Conc,
+      log_fc = Fold,
+      p_value = p.value,
+      fdr = FDR
+    )
+}
+
+
+read_correct_cache <- function(type = "broad", spike = TRUE) {
+  s <- ifelse(spike, "_spike", "")
+  d <- readr::read_rds(paste0("cache/dbc_", type, s, ".rds"))
+  d$class[c("bamRead", "Spikein"), ] <- d$class[c("bamRead", "Spikein"), ] |>
+    str_replace("./bam", "/Volumes/mgierlinski/projects/h3mecut/bam")
+  d
+}
