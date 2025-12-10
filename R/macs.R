@@ -70,14 +70,14 @@ plot_peak_distribution_sample <- function(npeaks, smpl, chrom_sizes, bin_size = 
     )
   
   ggplot() +
-    th +
+    th() +
     geom_segment(data = cs, aes(x = 0, xend = chrom_size, y = chr, yend = chr), colour = "grey80") +
     geom_segment(data = np, aes(x = mid, xend = mid, y = y, yend = y + n, group = y), linewidth = bar_size) +
     labs(x = "Position on chromosome (Mb)", y = "Normalized peak count")
 }
 
-
-plot_peak_distribution_chrom <- function(npeaks, chrom, meta, bin_size = 1, bar_size = 1.2) {  
+# Normfac is a tibble with sample and norm columns
+plot_peak_distribution_chrom <- function(npeaks, chrom, meta, normfac = NULL, bin_size = 1, bar_size = 1.2) {  
   np <- npeaks |> 
     filter(chr == chrom & str_detect(sample, "Me3")) |>
     mutate(
@@ -96,11 +96,19 @@ plot_peak_distribution_chrom <- function(npeaks, chrom, meta, bin_size = 1, bar_
       s = s / max(s) * 0.8,
       n = n / max(n) * 0.8
     ) |> 
-    left_join(meta, by = join_by(sample))
+    left_join(meta, by = join_by(sample)) |> 
+    select(sample, mid, n, group)
   
+  if(!is.null(normfac)) {
+    np <- np |> 
+      left_join(normfac, by = join_by(sample)) |> 
+      mutate(n = n / norm) |> 
+      select(-norm)
+  }
+
   np |> 
     ggplot() +
-    th +
+    th() +
     theme(
       axis.text.y = element_blank(),
       axis.ticks.y = element_blank()
@@ -110,3 +118,5 @@ plot_peak_distribution_chrom <- function(npeaks, chrom, meta, bin_size = 1, bar_
     facet_wrap(~sample, ncol = 1, strip.position = "right") +
     labs(x = "Position on chromosome (Mb)", y = "Normalized peak count")
 }
+
+

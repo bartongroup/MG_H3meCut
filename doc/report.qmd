@@ -336,17 +336,17 @@ There seem to be serious issues with di-methyl samples. They:
 
 Mitochondrial reads are usually uninformative background, and they can inflate the sequencing depth, duplicate rates and distort normalisation. Therefore, the reads mapping to the mitochondrial chromosome were removed from the BAM files.
 
-The filtered BAM files were converted to BED files using `bedtools bamtobed` and subsequently converted to BedGraph files taking spike-in normalisation into account.
-
 ## Spike-in normalisation
 
-The total count of read mapped to the Drosophila genome was used to create normalisation factors for methylation data. The normalisation factors are defined as
+### Normalisation from sequencing depths
+
+The total count of read mapped to the Drosophila genome was used to create normalisation factors for methylation data. The normalisation factors are found as
 
 $$
 f_i = \frac{10^6}{S_i},
 $$
 
-where $S_i$ is the sequencing depths (the total number of reads) in spike-in sample $i$. These scale factors $f_i$ are then used to scale the bedgraph values, for visualisation. They will be used for *DiffBind* as normalising factors later. The sequencing depths and scaling factors are shown in @fig-scale-factors.
+where $S_i$ is the sequencing depths (calculated using `samtools view -F 0x04 <bam_file> | wc -l`) in spike-in sample $i$. They are shown in @fig-scale-factors.
 
 ```{r}
 #| label: fig-scale-factors
@@ -354,6 +354,34 @@ where $S_i$ is the sequencing depths (the total number of reads) in spike-in sam
 #| fig-width: 5
 #| fig-height: 4
 tar_read(fig_spikein_norms) 
+```
+
+## Diffbind normalisation
+
+*DiffBind* package can apply spike-in normalisation internally, when provided with spike-in BAM files. The normalisation factors calculated by *DiffBind* are slightly different from the above, as they take into account only reads within consensus peaks. The comparison between the two methods is shown in @fig-compare-spikein-norm.
+
+
+```{r}
+#| label: fig-compare-spikein-norm
+#| fig-cap: Comparison of spike-in normalisation calculated from sequencing depths (horizontal axis) and from DiffBind (vertical axis).
+#| fig-width: 4
+#| fig-height: 3
+tar_read(fig_compare_spikein_norm)
+```
+
+## Spike-in versus library size normalisation
+
+Using spike-ins in any experiment is always a question of debate. Sometimes spike-ins can add more variance due to technical issues. Therefore, we also calculated normalisation factors based on library sizes (total number of mapped reads per sample). @fig-compare-spikein-libsize-norm shows the effects of both normalisation methods on peak signals. While library size normalisation shows little change between samples, spike-in normalisation leads to substantial differences in peak signals between *replicates* in the same condition. Therefore, we abandon spike-in normalisation and use library size normalisation for further analysis.
+
+
+```{r}
+#| label: fig-compare-spikein-libsize-norm
+#| fig-cap: A segment of chromosome 11. The panels show normalised counts in peaks, calculated by *DiffBind* and extracted from `binding` field in the *DiffBind* object, using (A) library size normalisation and (B) spike-in normalisation.
+#| fig-width: 8
+#| fig-height: 6
+pl2 <- tar_read(fig_peaks_chr11_spike_narrow)
+pl1 <- tar_read(fig_peaks_chr11_libs_narrow)
+plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 ```
 
 
@@ -372,8 +400,117 @@ Though H3K9me3 tend to create broad peaks (e.g. @Hu_2022), a narrow peak calling
 --keep-dup all --nolambda --nomodel -q 0.01 -g hs
 ```
 
+## Peak properties
+
+Peaks are detected everywhere. @fig-peak-chromosomes shows the distribution of narrow peaks across all chromosomes for one sample.
+
+```{r}
+#| label: fig-peak-chromosomes
+#| fig-cap: Narrow peak distribution across chromosomes for sample `Me3_iPS_Ctrl_1`.
+knitr::include_graphics("images/peaks_narrow_dist_ctrl.png")
+```
+
+There are hundreds of thousands of peaks detected in each sample, as seen in @fig-peak-count. There are slightly more broad peaks than narrow peaks.
+
+```{r}
+#| label: fig-peak-count
+#| fig-cap: Number of detected peaks per sample, for (A) narrow and (B) broad peaks.
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_npeaks_narrow) + scale_y_continuous(expand = expansion(0, 0.03), limits = c(0, 220000))
+pl2 <- tar_read(fig_npeaks_broad) + scale_y_continuous(expand = expansion(0, 0.03), limits = c(0, 220000))
+plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
+@fig-peak-width shows distribution of peak widths, across all samples, for narrow and broad peaks. Both distributions are similar for widths < 1000 bp, but broad peaks have a long tail of very wide peaks, extending well over 10,000 bp.
+
+```{r}
+#| label: fig-peak-width
+#| fig-cap: Width of peaks across all samples, for (A) narrow and (B) broad peaks.
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_peak_width_narrow)
+pl2 <- tar_read(fig_peak_width_broad)
+plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
+```
+
+Nevertheless, both narrow and broad peak calling detect similar regions. @fig-peak-example-1 shows an example of two peaks detected by both methods. The stronger peak on the right is the same in both cases, while the left peak is wider is wide calling.
+
+```{r}
+#| label: fig-peak-example-1
+#| fig-cap: Example of a peak and the MACS peak detection for narrow and broad peaks. 
+#| layout-ncol: 2
+#| fig-subcap: 
+#|   - "Narrow"
+#|   - "Broad"
+knitr::include_graphics(c("images/peak_example_1_narrow.png", "images/peak_example_1_broad.png"))
+```
 
 
+There are a few cases where broad peak calling detects only a few peaks in a broad region, while narrow peak calling detects hundreds of peaks. An example is shown in @fig-peak-example-2.
+
+```{r}
+#| label: fig-peak-example-2
+#| fig-cap: Example of a broad region where narrow broad calling detects only a few peaks, while narrow calling detects hundreds of peaks. There is some software bug when exporting Gviz figures, so the pile-up data in the right panel is missing - this is identical to the left panel.
+#| layout-ncol: 2
+#| fig-subcap: 
+#|   - "Narrow"
+#|   - "Broad"
+knitr::include_graphics(c("images/peak_example_2_narrow.png", "images/peak_example_2_broad.png"))
+```
+
+## Peak annotations
+
+We used to different packages to annotate peaks: *annotatr* and *chipseeker*. Both packages use different approaches and different genomic features for annotation. Ini particular, *chipseeker* includes intergenic regions, while *annotatr* does not. Results of annotations for all peaks are shown in @fig-peak-annotations. Both methods show similar trends, with most peaks located in intronic and intergenic regions. There are no obvious large-scale differences between conditions.
+
+```{r}
+#| label: fig-peak-annotations
+#| fig-cap: Peak annotations using (A) *annotatr* package and (B) *chipseeker* package, for broad peaks.
+#| fig-width: 8
+#| fig-height: 10
+pl1 <- tar_read(fig_annotatr_broad)
+pl2 <- tar_read(fig_chipseeker_broad)
+plot_grid(pl1, pl2, ncol = 1, labels = c("A ", "B"), rel_heights = c(1, 1.2))
+```
+
+# Differential binding analysis
+
+[Differential binding analysis](https://bioconductor.org/packages/release/bioc/vignettes/DiffBind/inst/doc/DiffBind.pdf) was performed using the *DiffBind* package. Both narrow and broad peaks were analysed. Here we present results for broad peaks only, while narrow peak results are available for download in @sec-downloads.
+
+## Model with two factors
+
+The design included two factors: time point (iPS vs PSM) and treatment (control vs SETDB1 siRNA). The analysis used library size normalisation.
+
+```{r}
+#| label: fig-volcano
+#| fig-cap: Volcano plots for differential binding analysis using broad peaks, for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA). Black points indicate statistically significant peaks (FDR < 0.01).
+#| fig-width: 8
+#| fig-height: 4
+tar_read(fig_volcano_full_libs_broad)
+```
+
+```{r}
+#| label: fig-up-down
+#| fig-cap: Number of up- and down-regulated peaks for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA), using broad peaks.
+#| fig-width: 2.2
+#| fig-height: 3
+tar_read(fig_up_down_full_libs_broad)
+```
+
+### Gene set enrichment
+
+```{r}
+#| label: tbl-gsea
+#| tbl-cap: Functional terms enriched (FDR < 0.05) in GSE for the model with two factors.
+tar_read(gse_tab_full_libs_broad) |> 
+  select(`Term ID` = term_id, Name = term_name, Contrast = contrast, NES = nes, Size = size, Gnes = genes) |> 
+  arrange(NES) |> 
+  gt_table() |> 
+  fmt_number(
+    columns = vars(NES),
+    n_sigfig = 2
+  )
+```
 
 # Resources
 

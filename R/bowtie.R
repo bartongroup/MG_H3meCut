@@ -60,7 +60,7 @@ plot_bowtie_summaries <- function(bsum, meta) {
     pivot_longer(-sample)  |> 
     left_join(meta, by = join_by(sample)) |> 
   ggplot(aes(x = group, y = value, fill = replicate)) +
-    th +
+    th() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1)
     ) +
@@ -107,7 +107,7 @@ plot_picard_duplication <- function(pd, meta) {
     pivot_longer(-sample) |> 
     left_join(meta, by = join_by(sample)) |> 
   ggplot(aes(x = group, y = value, fill = replicate)) +
-    th +
+    th() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1)
     ) +
@@ -127,7 +127,7 @@ plot_spikein_ratios <- function(bowtie_sum_merged, meta) {
     ) |> 
     left_join(meta, by = join_by(sample)) |> 
   ggplot(aes(x = group, y = dp_prop, fill = replicate)) +
-    th +
+    th() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1)
     ) +

@@ -244,7 +244,7 @@ plot_mitochondrial_proportion <- function(ids, meta) {
     mutate(MT_perc = 100 * MT / (MT + not_MT)) |> 
     left_join(meta, by = join_by(sample)) |> 
   ggplot(aes(x = group, y = MT_perc, fill = replicate)) +
-    th +
+    th() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1)
     ) +
@@ -330,7 +330,7 @@ plot_spikein_norms <- function(sn, meta) {
     pivot_longer(-sample) |> 
     left_join(meta, by = join_by(sample)) |> 
     ggplot(aes(x = group, y = value, fill = replicate)) +
-    th +
+    th() +
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1)
     ) +

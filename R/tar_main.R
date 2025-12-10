@@ -5,16 +5,18 @@ targets_main <- function() {
     mart = new_mart(config_annot),
     chromosomes = biomart_fetch_chromosomes(mart),
     #structures = biomart_fetch_structures(mart, gene_ids),
-    gns = biomart_fetch_genes(mart)
-    #terms = get_functional_terms(config_annot, gns),
-    #fterms = prepare_terms_fenr(terms, counts$genes$id)
+    gns = biomart_fetch_genes(mart),
+    terms = get_functional_terms(config_annot, gns),
+    fterms = prepare_terms_fenr(terms)
   )
 
   setup_experiment <- tar_plan(
     tar_target(config_file, "config.json", format = "file"),
     config = jsonlite::read_json(config_file),
     tar_target(sample_file, config$sample_file, format = "file"),
-    metadata = read_metadata(sample_file)
+    metadata = read_metadata(sample_file),
+    metadata3 = metadata |> dplyr::filter(experiment == "Me3") |> droplevels(),
+    meta3 = metadata3 |> dplyr::mutate(dplyr::across(c(sample, group), ~stringr::str_remove(., "^Me3_")))
   )
 
   qc <- tar_plan(
@@ -47,37 +49,101 @@ targets_main <- function() {
 
   read_data <- tar_plan(
     chrom_sizes = readr::read_tsv(file.path(config$data_path, config$dir$genome, "chrom_sizes.txt"), col_names = c("chr", "chrom_size"), show_col_types = FALSE),
-    peaks_broad = read_peak_files(config, metadata, format = "broad"),
-    peaks_narrow = read_peak_files(config, metadata, format = "narrow")
+    annotations = build_human_annotations()
   )
 
-  map_diffbind <- tar_map(
+  map_peaks <- tar_map(
     values = tibble::tibble(TYPE = c("broad", "narrow")),
     names = TYPE,
 
     tar_plan(
-      meta_db = make_diffbind_metadata(metadata, config, type = TYPE, expm = "Me3"),
-      sav_meta_db = make_diffbind_metadata_for_cluster(metadata, config, type = TYPE, expm = "Me3"),
+      peaks = read_peak_files(config, metadata3, format = TYPE),
+      fig_npeaks = plot_number_of_peaks(peaks, metadata3),
+      fig_peak_width = plot_peak_width_distribution(peaks),
+
+      # Annotate all peaks
+      peaks_annotatr = annotate_peaks_annotatr(peaks, annotations),
+      peaks_chipseeker = annotate_peaks_chipseeker(peaks),
+      fig_annotatr = plot_peak_annotatios(peaks_annotatr),
+      fig_chipseeker = plot_peak_annotatios(peaks_chipseeker),
+
+      # Prepare for DiffBind
+      meta_db = make_diffbind_metadata(metadata3, config, type = TYPE),
+      sav_meta_db = make_diffbind_metadata_for_cluster(metadata3, config, type = TYPE),
       # These steps are very slow, so we cache the result
       # db = read_and_count_diffbind(meta_db, min_overlap = 2),
       # db_spike = spikein_normalization(dbc),
-      db = read_correct_cache(TYPE, spike = FALSE),
-      db_spike = read_correct_cache(TYPE, spike = TRUE),
+    )
+  )
 
-      dbc_full = de_full_model(db_spike),
-      dbc_groups = de_groups(db_spike),
+  # Map over normalization and peak type
+  map_diffbind <- tar_map(
+    values = tidyr::expand_grid(
+      NORM = c("libs", "spike"),
+      TYPE = c("broad", "narrow")
+    ) |> dplyr::mutate(
+      NAME = stringr::str_glue("{NORM}_{TYPE}")
+    ),
+    names = NAME,
 
-      dec_full = extract_de_results(dbc_full),
-      dec_groups = extract_de_results(dbc_groups)
+    tar_plan(
+      db = read_cache(TYPE, NORM),
 
+      fig_clust = plot_db_clustering(db, metadata3),
+      fig_peaks_chr11 = plot_db_biding_region(db, metadata3, make_region("11", 40e6, 60e6)),
+    ),
+
+    # Map over two models
+    tar_map(
+      values = tibble::tibble(MODEL = c("full", "groups")),
+      names = MODEL,
+
+      tar_plan(
+        # Perform DiffBind analysis
+        dbc = de_model(db, MODEL),
+        # Extract DE results in a useful format
+        dec = extract_de_results(dbc),
+
+        fig_volcano = plot_volcano(dec),
+        fig_up_down = plot_up_down(dec),
+
+        # Annotate DE results
+        dec_annotatr = annotate_peaks_annotatr(dec, annotations),
+        dec_chipseeker = annotate_peaks_chipseeker(dec),
+        fig_dec_annotatr = plot_peak_annotatios(dec_annotatr |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
+        fig_dec_chipseeker = plot_peak_annotatios(dec_chipseeker |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
+
+        deg = prepare_de_genes(dec_chipseeker),
+        gse = fgsea_all_terms(deg, fterms, rank_expr = "-log_fc * log10(p_value)"),
+        gse_tab = tabulate_gsea(gse, gns)
+      )
     )
 
-
   )
+
+
 
  
 
   for_report <- tar_plan(
+      png_peak_example_1 = {
+        png(paste0("./doc/images/peak_example_1_", TYPE, ".png"), width = 640, height = 480)
+        plot_region_ggbio("Me3_iPS_Ctrl_2", config, metadata3, make_region(17, 26615466, 26624227), peaks_broad, peaks_narrow)
+        dev.off()
+      },
+      png_peak_example_2 = {
+        png(paste0("./doc/images/peak_example_2_", TYPE, ".png"), width = 640, height = 480)
+        plot_region_ggbio("Me3_iPS_SET_2", config, metadata3, make_region(12, 34250000, 34415000), peaks_broad, peaks_narrow)
+        dev.off()
+      },
+
+    normfac = tibble::tibble(
+      sample = db_libs_broad$samples$SampleID,
+      lib_size = db_libs_narrow$norm$DESeq2$lib.sizes,
+      libs_norm = db_libs_narrow$norm$DESeq2$norm.facs,
+      spike_norm = db_spike_narrow$norm$DESeq2$norm.facs
+    ),
+    fig_compare_spikein_norm = plot_compare_spikein_normalisation(normfac, spikein_norms),
     png_peaks_broad_ctrl = plot_peak_distribution_sample(peaks_broad, "Me3_iPS_Ctrl_1", chrom_sizes, bar_size = 1) |> gs("peaks_broad_dist_ctrl", width = 8, height = 8),
     png_peaks_narrow_ctrl = plot_peak_distribution_sample(peaks_narrow, "Me3_iPS_Ctrl_1", chrom_sizes, bar_size = 1) |> gs("peaks_narrow_dist_ctrl", width = 8, height = 8),
     png_peaks_broad_set = plot_peak_distribution_sample(peaks_broad, "Me3_iPS_SET_1", chrom_sizes, bar_size = 1) |> gs("peaks_broad_dist_set", width = 8, height = 8),
@@ -101,6 +167,7 @@ targets_main <- function() {
     setup_experiment,
     qc,
     read_data,
+    map_peaks,
     map_diffbind,
     for_report
   )

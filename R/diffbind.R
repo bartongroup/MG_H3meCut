@@ -1,5 +1,5 @@
-make_diffbind_metadata <- function(meta, config, type = "broad", expm = "Me3") {
-  if(type == "boad") {
+make_diffbind_metadata <- function(meta, config, type = "broad") {
+  if(type == "broad") {
     macs_path <- config$dir$macs_broad
     suffix <- "peaks.broadPeak"
   } else {
@@ -8,8 +8,6 @@ make_diffbind_metadata <- function(meta, config, type = "broad", expm = "Me3") {
   }
   
   meta |> 
-    filter(experiment == expm) |> 
-    droplevels() |> 
     transmute(
       SampleID = sample,
       Tissue = time_point,
@@ -25,9 +23,9 @@ make_diffbind_metadata <- function(meta, config, type = "broad", expm = "Me3") {
     )
 }
 
-make_diffbind_metadata_for_cluster <-  function(meta, config, type = "broad", expm = "Me3") {
+make_diffbind_metadata_for_cluster <-  function(meta, config, type = "broad") {
   config$remote_path <- "."
-  make_diffbind_metadata(meta, config, type, expm) |> 
+  make_diffbind_metadata(meta, config, type) |> 
     write_csv(str_glue("diffbind_metadata_{type}.csv"))
 }
 
@@ -116,6 +114,16 @@ de_groups <- function(dbc) {
   DiffBind::dba.analyze(dbc, bBlacklist = FALSE, bGreylist = FALSE)
 }
 
+de_model <- function(dbc, model) {
+  if(model == "full") {
+    de_full_model(dbc)
+  } else if (model == "groups") {
+    de_groups(dbc)
+  } else {
+    stop("Unknown model: ", model)
+  }
+}
+
 extract_de_results <- function(dbc) {
   contrasts <- DiffBind::dba.show(dbc, bContrasts = TRUE) |> 
     as_tibble() |> 
@@ -124,7 +132,7 @@ extract_de_results <- function(dbc) {
     contrast_name <- contrasts$contrast[i]
     DiffBind::dba.report(dbc, contrast = i, th = 1) |> 
       as_tibble() |> 
-      rename(conc_1 = 7, conc2 = 8) |> 
+      rename(conc_1 = 7, conc_2 = 8) |> 
       mutate(contrast = contrast_name)
   }) |> 
     bind_rows() |> 
@@ -134,7 +142,14 @@ extract_de_results <- function(dbc) {
       log_fc = Fold,
       p_value = p.value,
       fdr = FDR
-    )
+    ) |> 
+    mutate(peak_id = str_glue("{chr}:{start}-{end}"), .before = 1)
+}
+
+prepare_de_genes <- function(dec, keep_annot = c("Intron", "Exon", "Promoter (<=1kb)", "3' UTR", "5' UTR")) {
+  dec |> 
+    select(id = gene_id, contrast, log_fc, p_value, fdr, annotation) |>
+    filter(!is.na(id) & annotation %in% keep_annot)
 }
 
 
@@ -144,4 +159,14 @@ read_correct_cache <- function(type = "broad", spike = TRUE) {
   d$class[c("bamRead", "Spikein"), ] <- d$class[c("bamRead", "Spikein"), ] |>
     str_replace("./bam", "/Volumes/mgierlinski/projects/h3mecut/bam")
   d
+}
+
+
+read_cache <- function(type, norm) {
+  if(norm == "spike") {
+    read_correct_cache(type, spike = TRUE)
+  } else {
+    read_correct_cache(type, spike = FALSE) |> 
+      libsize_normalization()
+  }
 }

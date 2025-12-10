@@ -1,21 +1,45 @@
 annotate_peaks_chipseeker <- function(bed) {
   gr <- makeGRangesFromDataFrame(bed, keep.extra.columns = TRUE)
+  seqlevels(gr) <- paste0("chr",  seqlevels(gr))
 
-  pk <- annotatePeak(
+  pk <- ChIPseeker::annotatePeak(
     gr,
     tssRegion = c(0, 3000),
-    TxDb = TxDb.Hsapiens.UCSC.hg38.knownGene,
+    TxDb = TxDb.Hsapiens.UCSC.hg38.knownGene::TxDb.Hsapiens.UCSC.hg38.knownGene,
     annoDb = "org.Hs.eg.db",
     level = "gene"
   ) |> 
     as_tibble() |> 
     clean_names() |> 
     rename(
+      chr = seqnames,
       entrez_id = gene_id,
       gene_symbol = symbol,
       gene_id = ensembl,
-      gene_name = genename
-    )
+      gene_name = genename,
+      annot_id = annotation
+    ) |> 
+    mutate(
+      chr = str_remove(chr, "chr"),
+      annotation = annot_id |> str_remove("(?<=^(Intron|Exon))\\s*\\([^)]*\\)"),
+      annotation = fct_relevel(
+        annotation, 
+        c(
+          "Promoter (2-3kb)",
+          "Promoter (1-2kb)",
+          "Promoter (<=1kb)",
+          "5' UTR",
+          "Exon",
+          "Intron",
+          "3' UTR",
+          "Downstream (<1kb)",
+          "Downstream (1-2kb)",
+          "Downstream (2-3kb)",
+          "Distal Intergenic"
+        )
+      )
+    ) |> 
+    relocate(peak_id, .before = 1)
   
   # Extract gene biotype from org.Hs.eg.db and add to the result
   gids <- pk$entrez_id
@@ -30,12 +54,13 @@ annotate_peaks_chipseeker <- function(bed) {
     mutate(gene_biotype = gene_info$GENETYPE)
 }
 
-###############################################################
+
+#######################################################
 
 annotate_peaks_annotatr <- function(bed, annotations) {
   gr <- makeGRangesFromDataFrame(bed, keep.extra.columns = TRUE)
 
-  an <- annotate_regions(gr, annotations) |> 
+  an <- annotatr::annotate_regions(gr, annotations) |> 
     as_tibble() |> 
     clean_names()  |> 
     rename(
@@ -48,7 +73,7 @@ annotate_peaks_annotatr <- function(bed, annotations) {
     ) |> 
     mutate(
       annotation = annotation |> str_remove("hg38_genes_") |> str_remove("s$"),
-      peak_id = str_glue("{chr}:{start}-{end}{strand}")
+      annotation = fct_relevel(annotation, "1to5kb", "promoter", "5UTR", "exon", "intron", "3UTR"),
     ) |> 
     relocate(peak_id, .before = 1)
 
@@ -56,7 +81,7 @@ annotate_peaks_annotatr <- function(bed, annotations) {
   gids <- an$entrez_id |> 
     unique()
   gene_info <- AnnotationDbi::select(
-    org.Hs.eg.db,
+    org.Hs.eg.db::org.Hs.eg.db,
     keys = gids,
     columns = "GENETYPE",
     keytype = "ENTREZID"
@@ -71,26 +96,13 @@ annotate_peaks_annotatr <- function(bed, annotations) {
     left_join(gene_info, by = c("entrez_id"))
 }
 
-######################################################################
-
-annotate_all_chipseeker <- function(beds) {
-  ids <- unique(beds$id)
-  map(ids, function(i) {
-    beds |> 
-      filter(id == i) |> 
-      annotate_peaks_bed()
-  }) |> 
-    list_rbind()
-}
 
 ######################################################################
 
-annotate_all_annotatr <- function(bed) {
-  annotations <- build_annotations(genome = 'hg38', annotations = 'hg38_basicgenes')
+build_human_annotations <- function() {
+  annotations <- annotatr::build_annotations(genome = 'hg38', annotations = 'hg38_basicgenes')
   seqlevels(annotations) <- seqlevels(annotations) |> str_remove("^chr")
-
-  annotate_peaks_annotatr(bed, annotations)
-
+  return(annotations)
 }
 
 ######################################################################

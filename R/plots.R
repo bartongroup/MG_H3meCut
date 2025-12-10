@@ -1,9 +1,11 @@
 okabe_ito_palette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#AAAAAA", "#000000")
 
-th <- ggplot2::theme_bw() +
+th <- function() {
+  ggplot2::theme_bw() +
   ggplot2::theme(panel.grid = ggplot2::element_blank())
+}
 
-scientific_10 <- function(v, limit = 3.01) {
+scientific_10 <- function(v, limit = 3.99) {
   sc <- map_chr(v, function(x) {
     if (is.na(x)) {
       as.character(x)
@@ -123,3 +125,203 @@ plot_vmp <- function(res, expr_var = log_cpm, fc_var = log_fc, p_var = p_value, 
   )
 }
 
+
+plot_up_down <- function(dec, fdr_limit = 0.01) {
+  dec |> 
+    filter(fdr < fdr_limit) |>
+    mutate(direction = case_when(
+      log_fc > 0 ~ "Up",
+      log_fc <= 0 ~ "Down"
+    )) |> 
+    count(contrast, direction) |> 
+    mutate(n = if_else(direction == "Down", -n, n))  |> 
+  ggplot(aes(x = contrast, y = n, fill = direction)) +
+    th() +
+    theme(legend.position = "none") +
+    geom_col() +
+    geom_hline(yintercept = 0, linewidth = 0.1, alpha = 0.5) +
+    scale_fill_manual(values = c("Up" = "#0072B2", "Down" = "#D55E00")) +
+    #scale_y_continuous(labels = scientific_10) +
+    labs(x = NULL, y = "Number of differentially bound peaks")
+}
+
+plot_de_peak_distribution <- function(dec, chrom_sizes, fdr_limit = 0.01, chromosomes = c(1:22, "X", "Y")) {
+  cs <- chrom_sizes |> 
+    filter(chr != "MT") |> 
+    mutate(
+      chr = factor(chr, levels = chromosomes) |> fct_rev(),
+      y = chr |> as.integer(),
+      chrom_size = chrom_size / 1e6
+    ) 
+  np <- dec |> 
+    filter(fdr < fdr_limit) |>
+    mutate(
+      across(c(start, end), \(x) {x / 1e6}),
+      mid = (start + end) / 2,
+      chr = factor(chr, levels = chromosomes) |> fct_rev(),
+      y = chr |> as.integer(),
+      log_fc = log_fc / max(abs(log_fc)),
+      sgn = sign(log_fc) |> as_factor()
+    ) 
+  
+  ggplot() +
+    th() +
+    theme(legend.position = "none") +
+    geom_segment(data = cs, aes(x = 0, xend = chrom_size, y = chr, yend = chr), colour = "grey80") +
+    geom_segment(data = np, aes(x = mid, xend = mid, y = y, yend = y + log_fc, group = y, colour = sgn), linewidth = 0.5) +
+    scale_colour_manual(values = c("1" = "blue", "-1" = "red", "0" = "grey50")) +
+    facet_wrap(~contrast, ncol = 1, strip.position = "right") +
+    labs(x = "Position on chromosome (Mb)", y = "Normalized peak count")
+}
+
+
+plot_number_of_peaks <- function(peaks, meta) {
+  env <- new.env(parent = globalenv())
+
+  env$d <- peaks |> 
+    count(sample) |> 
+    left_join(meta, by = "sample")
+
+  with(env, {
+    d |> 
+      ggplot(aes(x = sample, y = n, fill = group)) +
+      th() +
+      theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1)
+      ) +
+      geom_col() +
+      scale_fill_manual(values = okabe_ito_palette) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.03))) +
+      labs(x = NULL, y = "Number of peaks")
+  })
+}
+
+
+plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample") {
+  env <- new.env(parent = globalenv())
+  env$ncol <- ncol
+  env$group_var <- group_var
+
+  env$d <- an |> 
+    mutate(grp = get(group_var)) |> 
+    distinct(grp, peak_id, annotation) |> 
+    count(grp, annotation)
+
+  with(env, {
+    d |> 
+      ggplot(aes(x = annotation, y = n, fill = annotation)) +
+      th() +
+      theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1)
+      ) +
+      geom_col() +
+      facet_wrap(~grp, ncol = ncol) +
+      scale_fill_brewer(palette = "Paired") +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scientific_10) +
+      labs(x = NULL, y = "Count")
+  })
+}
+
+
+
+plot_db_clustering <- function(db, meta, text_size = 10, colour_var = "group") {
+  tab <- db$binding[, 4:ncol(db$binding)]
+
+  dendr <- t(tab) |> 
+    dist(method = "euclidean") |> 
+    hclust(method = "complete") |>
+    dendsort::dendsort() |> 
+    ggdendro::dendro_data()
+  seg <- ggdendro::segment(dendr)
+  meta <- meta |>
+    mutate(
+      colvar = get(colour_var)
+    )
+  labs <- left_join(dendr$labels |> mutate(label = as.character(label)), meta, by = c("label" = "sample")) |> 
+    mutate(colour = okabe_ito_palette[as_factor(colvar)])
+ 
+ theme.d <- ggplot2::theme(
+    panel.grid.major = ggplot2::element_blank(),
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.background = ggplot2::element_blank(),
+    axis.text.y = ggplot2::element_text(size = text_size, colour = labs$colour),
+    axis.line.y = ggplot2::element_blank(),
+    axis.line.x = ggplot2::element_line(linewidth = 0.5),
+    axis.ticks.y = ggplot2::element_blank()
+  )
+  
+  ggplot() +
+    theme.d +
+    coord_flip() +
+    geom_segment(data = seg, aes(x = x, y = y, xend = xend, yend = yend)) +
+    scale_x_continuous(breaks = seq_along(labs$label), labels = labs$label) +
+    scale_y_continuous(expand = c(0,0), limits = c(0, max(seg$y) * 1.03)) +
+    scale_colour_manual(values = okabe_ito_palette) +
+    labs(x = NULL, y = "Distance")
+}
+
+
+plot_db_biding_region <- function(db, meta, region) {
+  env <- new.env(parent = globalenv())
+  
+  chr <- seqnames(region) |> as.character()
+  env$chr <- chr
+  env$d <- db$binding |> 
+    as_tibble() |>
+    mutate(CHR = db$chrmap[CHR]) |> 
+    filter(CHR == chr & END >= start(region) & START <= end(region)) |> 
+    pivot_longer(-c(CHR, START, END), names_to = "sample", values_to = "value") |> 
+    left_join(meta, by = "sample") |> 
+    mutate(pos = (START + END) / 2 / 1e6)
+
+  with(env, {
+    ggplot(d, aes(x = pos, xend = pos, y = 0, yend = value, colour = group)) + 
+      th() +
+      theme(
+        legend.position = "none",
+        strip.text = element_text(size = 7) 
+      ) +
+      geom_segment() +
+      scale_colour_manual(values = okabe_ito_palette) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.03))) +
+      facet_wrap(~sample, ncol = 4) +
+      labs(x = str_glue("Position on chromosome {chr} (Mb)"), y = "Binding signal")
+  })
+}
+
+
+plot_compare_spikein_normalisation <- function(normfac, spikein_norms) {
+  normfac |>
+    left_join(spikein_norms, by = join_by(sample)) |> 
+    mutate(
+      depth_norm = 1 / scale,
+      depth_norm = depth_norm / mean(depth_norm)
+    ) |> 
+  ggplot(aes(x = depth_norm, y = spike_norm)) +
+    th() +
+    geom_point() +
+    geom_abline(slope = 1, intercept = 0, colour = "brown", linetype = "dashed") +
+    labs(x = "Spike-in normalisation from spike-in counts", y = "Spike-in normalisation from DiffBind")
+}
+
+
+plot_peak_width_distribution <- function(peaks) {
+  env <- new.env(parent = globalenv())
+    
+  env$d <- peaks |> 
+    mutate(width = end - start) |> 
+    select(width)
+
+  with(env, {
+    d |> 
+      ggplot(aes(x = width, y = after_stat(density))) +
+      th() +
+      geom_histogram(bins = 200) +
+      scale_x_log10(labels = scientific_10) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scientific_10) +
+      labs(x = "Peak width (bp)", y = "Density")
+  })
+    
+}

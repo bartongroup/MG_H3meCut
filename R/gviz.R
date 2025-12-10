@@ -96,7 +96,7 @@ get_region_from_file <- function(file, region) {
 
 # need global variables mart and fm
 plot_region <- function(samples, config, meta, region, mart, ymax = NULL, peaks = NULL, type = "bam",
-                        with.tracks = TRUE, stacking = "squish") {
+                        with.tracks = FALSE, stacking = "squish") {
   samples <- as.character(samples)
   
   options(ucscChromosomeNames = FALSE)
@@ -114,12 +114,15 @@ plot_region <- function(samples, config, meta, region, mart, ymax = NULL, peaks 
 
   if(with.tracks) {
     grt <- tryCatch({
-      #GeneRegionTrack(txdb, chromosome = chr, start = start(region), end = end(region))
-      BiomartGeneRegionTrack(chromosome = chr, start = start(region), end = end(region), featureMap = fm, biomart = mart, stacking = stacking)
+      txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene::TxDb.Hsapiens.UCSC.hg38.knownGene
+      Gviz::GeneRegionTrack(txdb, chromosome = str_glue("chr{chr}"), start = start(region), end = end(region))
+      #BiomartGeneRegionTrack(chromosome = chr, start = start(region), end = end(region), featureMap = fm, biomart = mart, stacking = stacking)
     }, error=function(err) {
       print("Error creating genomic tracks: skipped.")
       return(NULL)
     })
+  } else {
+    grt <- NULL
   }
   #if(!is.null(gr)) grt <- GeneRegionTrack(range=gr, name="Ensembl", stacking=stacking)
   
@@ -169,5 +172,19 @@ plot_region <- function(samples, config, meta, region, mart, ymax = NULL, peaks 
 }
 
 
+plot_region_peak_id <- function(peakid, config, meta, peaks, mart, f = 2) {
+  if(is.numeric(peakid)) {
+    peakid <- peaks$peak_id[peakid]
+  }
 
+  pk <- peaks |> 
+    filter(peak_id == peakid)
+  stopifnot(nrow(pk) == 1)
 
+  sample <- pk$sample[1] |> as.character()
+
+  region <- make_region(pk$chr, pk$start, pk$end) |> 
+    expand_region(f = f)
+
+  plot_region(sample, config, meta, region, mart, peaks = peaks)
+}
