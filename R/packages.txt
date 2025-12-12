@@ -9,3 +9,4 @@ ggbeeswarm
 cowplot
 broom
 rtracklayer
+ggbio

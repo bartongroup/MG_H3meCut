@@ -122,7 +122,7 @@ MERGED_BAMS = expand("bam_human/{group}.merged.bam", group = GROUPS)
 ####################################################################
 
 rule all:
-   input: ENVIRONMENT + CHRSTATS + MULTIQC + TRIM_COUNTS + CHRSTATS + QUALIMAPS + MACS3_BROAD_PEAKS + MACS3_NARROW_PEAKS
+   input: ENVIRONMENT + CHRSTATS + MULTIQC + TRIM_COUNTS + CHRSTATS + QUALIMAPS + MACS3_BROAD_PEAKS + MACS3_NARROW_PEAKS + BEDGRAPHS
 
 ####################################################################
 # Save environment
@@ -339,15 +339,6 @@ rule chr_counts:
         'samtools idxstats {input.bam} > {output}'
 
 
-####################################################################
-# Index BAM files
-
-rule index_bam:
-    input: 'bam_{genome}/{sample}.bam'
-    output: 'bam_{genome}/{sample}.bam.bai'
-    threads: 8
-    shell:
-        'samtools index {input}'
 
 ####################################################################
 # Qualimap
@@ -404,98 +395,34 @@ rule merge_bam_replicates:
 
 
 
-###################################################################
-# Make BED files
-
-rule make_fragments_bed:
-    input:
-        bam = "bam_human/{sample}.noMT.bam"
-    output:
-        bed = "bed/{sample}.bed"
-    threads: 8
-    log:
-        "logs/make_fragments_bed/{sample}.log"
-    shell:
-        r"""
-        (
-          mkdir -p $(dirname {output.bed})
-
-          # Keep the read pairs that are on the same chromosome and fragment length less than 1000bp.
-          # Only extract the fragment related columns 
-          samtools sort -n -@ {threads} {input.bam}  \
-          | bedtools bamtobed -bedpe -i stdin \
-          | awk '$1==$4 && $6-$2 < 1000 {{print $0}}' \
-          | cut -f 1,2,6 - \
-          | sort -k1,1 -k2,2n -k3,3n \
-          > {output.bed}
-          
-          # ChatGPT stuff:
-          # Name-sort on the fly, convert BAM to BEDPE, then reduce to fragment intervals.
-          # bedtools bamtobed -bedpe columns:
-          # 1:chrom1 2:start1 3:end1 4:chrom2 5:start2 6:end2 7:name 8:score 9:strand1 10:strand2
-
-          # samtools sort -n -@ {threads} {input.bam}  \
-          # | bedtools bamtobed -bedpe -i stdin \
-          # | awk 'BEGIN{{OFS="\t"}} $1==$4 {{s=$2; e=$6; if (s>e) {{t=s; s=e; e=t}}; print $1, s, e, $7, $8, "+"}}' \
-          # | sort -k1,1 -k2,2n -k3,3n \
-          # > {output.bed}
-        ) &> {log}
-        """
-
 ####################################################################
-# Spike-in normalisation
+# Create bedgraphs from BAM files
 
-rule spikein_depth:
+rule bam_to_bedgraph:
     input:
-        bam = "bam_dm/{sample}.bam"
-    output:
-        depth = "spikein/{sample}.spikein_depth.txt",
-        scale = "spikein/{sample}.spikein_scale.txt"
-    shell:
-        r"""
-        mkdir -p spikein
-
-        # Count aligned reads (exclude unmapped: -F 0x04)
-        total_reads=$(samtools view -F 0x04 {input.bam} | wc -l)
-
-        # Paired-end: each pair contributes 2 records → divide by 2
-        seq_depth=$(( total_reads / 2 ))
-
-        echo "$seq_depth" > {output.depth}
-
-        # Scale factor = target_depth / spikein_depth
-        scale_factor=$(echo "{SPIKEIN_TARGET_DEPTH} / $seq_depth" | bc -l)
-        echo "$scale_factor" > {output.scale}
-        """
-
-####################################################################
-# Create bedgraphs using spike-in normalisation
-
-rule normalize_fragments_bedgraph:
-    input:
-        fragments = "bed/{sample}.bed",
-        scale     = "spikein/{sample}.spikein_scale.txt",
+        bam        = "bam_human/{sample}.noMT.bam",
+        bai        = "bam_human/{sample}.noMT.bam.bai",   
         chromsizes = HUMAN_CHROM_SIZES
     output:
         bg = "bedgraph/{sample}.bedgraph"
+    threads: 4
     log:
-        "logs/normalize_fragments_bedgraph/{sample}.log"    
+        "logs/bam_to_bedgraph/{sample}.bedgraph.log"
     shell:
         r"""
         (
           mkdir -p $(dirname {output.bg})
 
-          scale_factor=$(cat {input.scale})
-
+          # Create per-base coverage bedGraph from BAM.
+          # Assumes BAM is coordinate-sorted.
           bedtools genomecov \
+            -ibam {input.bam} \
             -bg \
-            -scale "$scale_factor" \
-            -i {input.fragments} \
             -g {input.chromsizes} \
-          | sort -k1,1 -k2,2n \
           > {output.bg}
         ) &> {log}
         """
+
 
 ####################################################################
 # Create bigWigs from bedGraphs

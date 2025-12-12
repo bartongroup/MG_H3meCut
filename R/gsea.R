@@ -77,7 +77,7 @@ tabulate_gsea <- function(gse, gns, fdr_limit = 0.05, max_n = 12) {
     left_join(g2s, by = "id") |> 
     select(-id) |> 
     group_by(ontology, term_id, term_name, contrast, nes, fdr, size) |>
-    summarise(genes = gene_symbol |> head(max_n) |> str_c(collapse = ", ")) |> 
+    summarise(genes = gene_symbol |> unique() |> head(max_n) |> str_c(collapse = ", ")) |> 
     ungroup()
 }
 

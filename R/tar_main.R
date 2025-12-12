@@ -113,6 +113,8 @@ targets_main <- function() {
         fig_dec_annotatr = plot_peak_annotatios(dec_annotatr |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
         fig_dec_chipseeker = plot_peak_annotatios(dec_chipseeker |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
 
+        sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
+
         deg = prepare_de_genes(dec_chipseeker),
         gse = fgsea_all_terms(deg, fterms, rank_expr = "-log_fc * log10(p_value)"),
         gse_tab = tabulate_gsea(gse, gns)
@@ -126,16 +128,14 @@ targets_main <- function() {
  
 
   for_report <- tar_plan(
-      png_peak_example_1 = {
-        png(paste0("./doc/images/peak_example_1_", TYPE, ".png"), width = 640, height = 480)
-        plot_region_ggbio("Me3_iPS_Ctrl_2", config, metadata3, make_region(17, 26615466, 26624227), peaks_broad, peaks_narrow)
-        dev.off()
-      },
-      png_peak_example_2 = {
-        png(paste0("./doc/images/peak_example_2_", TYPE, ".png"), width = 640, height = 480)
-        plot_region_ggbio("Me3_iPS_SET_2", config, metadata3, make_region(12, 34250000, 34415000), peaks_broad, peaks_narrow)
-        dev.off()
-      },
+    db_none_broad = no_normalization(db_libs_broad),
+    fig_norm_compare = plot_all_total_bindings(db_none_broad, db_libs_broad, db_spike_broad, metadata3),
+
+    fig_peak_example_1 = plot_region_ggbio("Me3_iPS_Ctrl_2", config, metadata3, make_region(17, 26615466, 26624227), peaks_broad, peaks_narrow),
+    fig_peak_example_2 = plot_region_ggbio("Me3_iPS_SET_2", config, metadata3, make_region(12, 34250000, 34415000), peaks_broad, peaks_narrow),
+
+    fig_de_abu_example_1 = plot_peak_bindings(dbc_full_libs_broad, "5:70822898-70823402", metadata3),
+    fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_full_libs_broad |> dplyr::filter(contrast == "48h-iPS"), "5:70822898-70823402", config, metadata3, peaks_broad, peaks_narrow, normfac |> dplyr::mutate(norm = libs_norm)),
 
     normfac = tibble::tibble(
       sample = db_libs_broad$samples$SampleID,
@@ -149,6 +149,11 @@ targets_main <- function() {
     png_peaks_broad_set = plot_peak_distribution_sample(peaks_broad, "Me3_iPS_SET_1", chrom_sizes, bar_size = 1) |> gs("peaks_broad_dist_set", width = 8, height = 8),
     png_peaks_broad_48 = plot_peak_distribution_sample(peaks_broad, "Me3_48h_SET_1", chrom_sizes, bar_size = 1) |> gs("peaks_broad_dist_48", width = 8, height = 8),
     png_peaks_broad_11 = plot_peak_distribution_chrom(peaks_broad, "11", metadata) |> gs("peaks_broad_11", width = 8, height = 8)
+  )
+
+  for_shiny <- tar_plan(
+    sav_shiny = prepare_for_shiny(dbc_full_libs_broad, dbc_full_spike_broad, dbc_groups_libs_broad, dbc_groups_spike_broad,
+                              metadata3, terms, gns)
   )
 
 
@@ -169,7 +174,8 @@ targets_main <- function() {
     read_data,
     map_peaks,
     map_diffbind,
-    for_report
+    for_report,
+    for_shiny
   )
   
 }

@@ -62,3 +62,11 @@ read_metadata <- function(sample_file) {
     arrange(experiment, time_point, treatment, replicate) |> 
     mutate(sample = as_factor(sample), group = as_factor(group))
 }
+
+
+write_dec <- function(dec, name) {
+  fname = file.path("tab", str_glue("{name}.csv"))
+  dec |> 
+    mutate(across(where(is.double), ~signif(.x, 4))) |> 
+    write_csv(fname)
+}

@@ -137,7 +137,7 @@ plot_up_down <- function(dec, fdr_limit = 0.01) {
     mutate(n = if_else(direction == "Down", -n, n))  |> 
   ggplot(aes(x = contrast, y = n, fill = direction)) +
     th() +
-    theme(legend.position = "none") +
+    theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1)) +
     geom_col() +
     geom_hline(yintercept = 0, linewidth = 0.1, alpha = 0.5) +
     scale_fill_manual(values = c("Up" = "#0072B2", "Down" = "#D55E00")) +
@@ -206,7 +206,8 @@ plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample") {
   env$d <- an |> 
     mutate(grp = get(group_var)) |> 
     distinct(grp, peak_id, annotation) |> 
-    count(grp, annotation)
+    count(grp, annotation) |> 
+    mutate(n = n / 1000)
 
   with(env, {
     d |> 
@@ -217,10 +218,10 @@ plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample") {
         axis.text.x = element_text(angle = 45, hjust = 1)
       ) +
       geom_col() +
-      facet_wrap(~grp, ncol = ncol) +
+      facet_wrap(~grp, ncol = ncol, scales = "free_y") +
       scale_fill_brewer(palette = "Paired") +
       scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scientific_10) +
-      labs(x = NULL, y = "Count")
+      labs(x = NULL, y = "Count (thousands)")
   })
 }
 
@@ -324,4 +325,47 @@ plot_peak_width_distribution <- function(peaks) {
       labs(x = "Peak width (bp)", y = "Density")
   })
     
+}
+
+
+plot_total_bindings <- function(db, meta, y_max = NA) {
+  extract_bindings(db) |> 
+    group_by(sample) |> 
+    summarise(tot = sum(value) / 1e6) |> 
+    left_join(meta, by = join_by(sample)) |> 
+  ggplot(aes(x = group, y = tot, fill = replicate)) +
+    th() +
+    theme(
+       legend.position = "none",
+       axis.text.x = element_text(angle = 45, hjust = 1)
+    ) +
+    geom_beeswarm(size = 2, cex = 3, shape = 21, colour = "grey50") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, y_max)) +
+    scale_fill_manual(values = okabe_ito_palette) +
+    labs(x = NULL, y = "Total normalised abundance")
+}
+
+plot_all_total_bindings <- function(db_none, db_libs, db_spike, meta, y_max = 60) {
+  pl1 <- plot_total_bindings(db_none, meta, y_max) + ylab(expression(Raw~count~("×"~10^6)))
+  pl2 <- plot_total_bindings(db_libs, meta, y_max) + ylab(expression(Library~size~normalised~count~("×"~10^6)))
+  pl3 <- plot_total_bindings(db_spike, meta, y_max) + ylab(expression("Spike-in"~normalised~count~("×"~10^6)))
+
+  plot_grid(pl1, pl2, pl3, nrow = 1, labels = c("A", "B", "C"))
+}
+
+
+plot_peak_bindings <- function(db, pids, meta) {
+  db |> 
+    extract_bindings(pids) |> 
+    left_join(meta, by = join_by(sample)) |> 
+  ggplot(aes(x = group, y = value, fill = replicate)) +
+  th() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  geom_beeswarm(size = 2, cex = 3, shape = 21) +
+  facet_wrap(~peak_id) +
+  scale_fill_manual(values = okabe_ito_palette) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.03))) +
+  labs(x = NULL, y = "Abundance")
 }

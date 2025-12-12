@@ -8,6 +8,8 @@ qc/*.zip
 multiqc/*.html
 bam_dm/*.txt
 bam_human/*.txt
+bam_human/Me3_*.noMT.bam
+bam_human/Me3_*.noMT.bam.bai
 qm_human/**
 qm_dm/**
 spikein/*.txt

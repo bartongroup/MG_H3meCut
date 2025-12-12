@@ -172,19 +172,20 @@ plot_region <- function(samples, config, meta, region, mart, ymax = NULL, peaks 
 }
 
 
-plot_region_peak_id <- function(peakid, config, meta, peaks, mart, f = 2) {
-  if(is.numeric(peakid)) {
-    peakid <- peaks$peak_id[peakid]
+plot_region_peak_id <- function(dec, peakid, config, meta, peaks, mart, f = 2) {
+    if(is.numeric(peakid)) {
+    peakid <- dec$peak_id[peakid]
   }
 
-  pk <- peaks |> 
+  pk <- dec |> 
     filter(peak_id == peakid)
   stopifnot(nrow(pk) == 1)
 
-  sample <- pk$sample[1] |> as.character()
+  #sample <- pk$sample[1] |> as.character()
+  samples <- meta |> filter(as.character(replicate) == "1") |> pull(sample) |> as.character()
 
   region <- make_region(pk$chr, pk$start, pk$end) |> 
     expand_region(f = f)
 
-  plot_region(sample, config, meta, region, mart, peaks = peaks)
+  plot_region(samples, config, meta, region, mart, peaks = peaks)
 }

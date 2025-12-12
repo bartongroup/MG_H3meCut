@@ -17,9 +17,7 @@ cluster/*
 !cluster/env.txt
 !cluster/subtiwiki/
 !cluster/subtiwiki/make_ncrna_gtf.R
-shiny/de_genes/data
-shiny/de_operons/data
-shiny/browser/data
+shiny/data
 fig/
 snakejob*
 Rplots.pdf

@@ -340,6 +340,8 @@ Mitochondrial reads are usually uninformative background, and they can inflate t
 
 ### Normalisation from sequencing depths
 
+NOTE: this is not in use.
+
 The total count of read mapped to the Drosophila genome was used to create normalisation factors for methylation data. The normalisation factors are found as
 
 $$
@@ -369,10 +371,25 @@ tar_read(fig_spikein_norms)
 tar_read(fig_compare_spikein_norm)
 ```
 
-## Spike-in versus library size normalisation
+## Which normalisation to use
 
-Using spike-ins in any experiment is always a question of debate. Sometimes spike-ins can add more variance due to technical issues. Therefore, we also calculated normalisation factors based on library sizes (total number of mapped reads per sample). @fig-compare-spikein-libsize-norm shows the effects of both normalisation methods on peak signals. While library size normalisation shows little change between samples, spike-in normalisation leads to substantial differences in peak signals between *replicates* in the same condition. Therefore, we abandon spike-in normalisation and use library size normalisation for further analysis.
+CUT&Tag, like any other sequencing experiment, is compositional, because the abundance (composition) of each peak is relative to all others. No absolute abundances can be inferred directly from sequencing data. Spike-in normalisation in methylation experiments is intended to help identify global changes in methylation between conditions. On the other hand, the amount of spike-in material cannot be controlled precisely, and in some cases spike-ins can add noise to the data.
 
+To assess the applicability of spike-ins, the total abundance across all peaks (over all chromosomes) was calculated for each sample under three normalisation schemes: no normalisation (raw counts), sequencing depth (library size) normalisation, and spike-in normalisation. If there is a global change in methylation between conditions (for example, an increase upon differentiation) then all four replicates under spike-in normalisation should show an increase in total abundance.
+
+The results of this test are shown in @fig-norm-comp. Unfortunately, spike-in normalisation yields markedly inconsistent results between replicates. Upon differentiation (48 h) there is a sign of increased total abundance, but only in two out of four replicates. In particular, Me3_48h_Ctrl shows a 6.6-fold variation between replicates when spike-in normalisation is applied.
+
+We note that the large variation in spike-in-normalised data for Me3_48h_Ctrl may be due to (at least) two reasons. First, the spike-ins may have been unreliable, with the amount of Drosophila DNA added varying between samples. However, there is a second possibility. In @fig-norm-comp we see that after spike-in normalisation the total peak counts are stable in iPS_Ctrl but increase with treatment and time, with a large spread at 48 h. It is therefore possible that different replicates responded differently to siRNA and time, leading to genuine differences in total methylation. Unfortunately, we cannot determine which of these two scenarios actually occurred.
+
+```{r}
+#| label: fig-norm-comp
+#| fig-cap: "Comparison of normalisations: (A) raw counts, (B) library size and (C) spike-in. The vertical axis shows the total normalised abundance across all peaks in each sample."
+#| fig-width: 8
+#| fig-height: 4
+tar_read(fig_norm_compare)
+```
+
+Another illustration of the same issues is shown in @fig-compare-spikein-libsize-norm. It shows the effects of library size and spike-in normalisation methods on peak signals. While library size normalisation shows little change between samples, spike-in normalisation leads to substantial differences in peak signals between *replicates* in the same condition. 
 
 ```{r}
 #| label: fig-compare-spikein-libsize-norm
@@ -383,6 +400,7 @@ pl2 <- tar_read(fig_peaks_chr11_spike_narrow)
 pl1 <- tar_read(fig_peaks_chr11_libs_narrow)
 plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 ```
+
 
 
 # Peak detection
@@ -439,11 +457,9 @@ Nevertheless, both narrow and broad peak calling detect similar regions. @fig-pe
 ```{r}
 #| label: fig-peak-example-1
 #| fig-cap: Example of a peak and the MACS peak detection for narrow and broad peaks. 
-#| layout-ncol: 2
-#| fig-subcap: 
-#|   - "Narrow"
-#|   - "Broad"
-knitr::include_graphics(c("images/peak_example_1_narrow.png", "images/peak_example_1_broad.png"))
+#| fig-width: 6
+#| fig-height: 4 
+tar_read(fig_peak_example_1)
 ```
 
 
@@ -451,12 +467,10 @@ There are a few cases where broad peak calling detects only a few peaks in a bro
 
 ```{r}
 #| label: fig-peak-example-2
-#| fig-cap: Example of a broad region where narrow broad calling detects only a few peaks, while narrow calling detects hundreds of peaks. There is some software bug when exporting Gviz figures, so the pile-up data in the right panel is missing - this is identical to the left panel.
-#| layout-ncol: 2
-#| fig-subcap: 
-#|   - "Narrow"
-#|   - "Broad"
-knitr::include_graphics(c("images/peak_example_2_narrow.png", "images/peak_example_2_broad.png"))
+#| fig-cap: Example of a peak and the MACS peak detection for narrow and broad peaks. 
+#| fig-width: 6
+#| fig-height: 4 
+tar_read(fig_peak_example_2)
 ```
 
 ## Peak annotations
@@ -467,43 +481,69 @@ We used to different packages to annotate peaks: *annotatr* and *chipseeker*. Bo
 #| label: fig-peak-annotations
 #| fig-cap: Peak annotations using (A) *annotatr* package and (B) *chipseeker* package, for broad peaks.
 #| fig-width: 8
-#| fig-height: 10
+#| fig-height: 14
 pl1 <- tar_read(fig_annotatr_broad)
 pl2 <- tar_read(fig_chipseeker_broad)
 plot_grid(pl1, pl2, ncol = 1, labels = c("A ", "B"), rel_heights = c(1, 1.2))
 ```
 
+
+
+
+
+
+
+
+
 # Differential binding analysis
 
 [Differential binding analysis](https://bioconductor.org/packages/release/bioc/vignettes/DiffBind/inst/doc/DiffBind.pdf) was performed using the *DiffBind* package. Both narrow and broad peaks were analysed. Here we present results for broad peaks only, while narrow peak results are available for download in @sec-downloads.
 
-## Model with two factors
+## Library-size normalisation
 
-The design included two factors: time point (iPS vs PSM) and treatment (control vs SETDB1 siRNA). The analysis used library size normalisation.
+In this Section differential binding analysis for library-size normalisation are shown.
+
+### Model with two factors
+
+The design included two factors: time point (iPS vs PSM) and treatment (control vs SETDB1 siRNA). @fig-volcano-full-libs-broad shows the volcano plot, @fig-up-down-full-libs-broad shows the number of peaks going up and down between factors.
 
 ```{r}
-#| label: fig-volcano
-#| fig-cap: Volcano plots for differential binding analysis using broad peaks, for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA). Black points indicate statistically significant peaks (FDR < 0.01).
+#| label: fig-volcano-full-libs-broad
+#| fig-cap: Volcano plots for differential binding analysis. Black points indicate statistically significant peaks (FDR < 0.01).
 #| fig-width: 8
 #| fig-height: 4
 tar_read(fig_volcano_full_libs_broad)
 ```
 
 ```{r}
-#| label: fig-up-down
+#| label: fig-up-down-full-libs-broad
 #| fig-cap: Number of up- and down-regulated peaks for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA), using broad peaks.
 #| fig-width: 2.2
-#| fig-height: 3
-tar_read(fig_up_down_full_libs_broad)
+#| fig-height: 4
+tar_read(fig_up_down_full_libs_broad) 
 ```
 
-### Gene set enrichment
+#### Annotation of differentially binding peaks
+
+@fig-dec-chipseeker-full-libs-broad shows the results of *ChipSeeker* annotation of the differentially binding peaks.
 
 ```{r}
-#| label: tbl-gsea
+#| label: fig-dec-chipseeker-full-libs-broad
+#| fig-cap: "*Chipseeker* annotations of differentially abundant peaks in each contrast."
+#| fig-width: 6
+#| fig-height: 4
+tar_read(fig_dec_chipseeker_full_libs_broad) 
+```
+
+#### Gene set enrichment
+
+`fgsea` R package was used for gene set enrichment analysis, using functional annotations from GO, KEGG and Reactome. A summary of statistically significant terms is shown in @tbl-gse-full-libs-broad.
+
+```{r}
+#| label: tbl-gse-full-libs-broad
 #| tbl-cap: Functional terms enriched (FDR < 0.05) in GSE for the model with two factors.
 tar_read(gse_tab_full_libs_broad) |> 
-  select(`Term ID` = term_id, Name = term_name, Contrast = contrast, NES = nes, Size = size, Gnes = genes) |> 
+  select(`Term ID` = term_id, Name = term_name, Contrast = contrast, NES = nes, Size = size, `Top genes` = genes) |> 
   arrange(NES) |> 
   gt_table() |> 
   fmt_number(
@@ -512,17 +552,151 @@ tar_read(gse_tab_full_libs_broad) |>
   )
 ```
 
+
+### Model with pair-wise contrasts
+
+The design included pairwise comparison between each condition.
+
+```{r}
+#| label: fig-volcano-groups-libs-broad
+#| fig-cap: Volcano plots for differential binding analysis using broad peaks, for pair-wise contrasts.
+#| fig-width: 8
+#| fig-height: 7
+tar_read(fig_volcano_groups_libs_broad)
+```
+
+```{r}
+#| label: fig-up-down-groups-libs-broad
+#| fig-cap: Number of up- and down-regulated peaks for pairwise-contrasts.
+#| fig-width: 4
+#| fig-height: 4
+tar_read(fig_up_down_groups_libs_broad) 
+```
+
+#### Annotation of differentially binding peaks
+
+```{r}
+#| label: fig-dec-chipseeker-groups-libs-broad
+#| fig-cap: "*Chipseeker* annotations of differentially abundant peaks in each contrast."
+#| fig-width: 8
+#| fig-height: 5
+tar_read(fig_dec_chipseeker_groups_libs_broad) 
+```
+
+#### Gene set enrichment
+
+```{r}
+#| label: tbl-gse-groups-libs-broad
+#| tbl-cap: Functional terms enriched (FDR < 0.05) in GSE for the model with two factors.
+tar_read(gse_tab_groups_libs_broad) |> 
+  select(`Term ID` = term_id, Name = term_name, Contrast = contrast, NES = nes, Size = size, `Top genes` = genes) |> 
+  arrange(NES) |> 
+  gt_table() |> 
+  fmt_number(
+    columns = vars(NES),
+    n_sigfig = 2
+  )
+```
+
+
+
+## Spike-in normalisation
+
+### Model with two factors
+
+```{r}
+#| label: fig-volcano-full-spike-broad
+#| fig-cap: Volcano plots for differential binding analysis using broad peaks, for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA). Black points indicate statistically significant peaks (FDR < 0.01).
+#| fig-width: 8
+#| fig-height: 4
+tar_read(fig_volcano_full_spike_broad)
+```
+
+```{r}
+#| label: fig-up-down-full-spike-broad
+#| fig-cap: Number of up- and down-regulated peaks for time point effect (iPS vs PSM) and treatment effect (control vs SETDB1 siRNA), using broad peaks.
+#| fig-width: 2.2
+#| fig-height: 4
+tar_read(fig_up_down_full_spike_broad) 
+```
+
+#### Annotation of differentially binding peaks
+
+```{r}
+#| label: fig-dec-chipseeker-spike-libs-broad
+#| fig-cap: "*Chipseeker* annotations of differentially abundant peaks in each contrast."
+#| fig-width: 6
+#| fig-height: 4
+tar_read(fig_dec_chipseeker_full_spike_broad) 
+```
+
+#### Gene set enrichment
+
+```{r}
+#| label: tbl-gse-full-spike-broad
+#| tbl-cap: Functional terms enriched (FDR < 0.05) in GSE for the model with two factors.
+tar_read(gse_tab_full_spike_broad) |> 
+  select(`Term ID` = term_id, Name = term_name, Contrast = contrast, NES = nes, Size = size, `Top genes` = genes) |> 
+  arrange(NES) |> 
+  gt_table() |> 
+  fmt_number(
+    columns = vars(NES),
+    n_sigfig = 2
+  )
+```
+
+
+
+
+# Peak examples
+
+```{r}
+#| label: fig-de-peak-example-1
+#| fig-cap: A differentially abundant peak in contrast 48h-iPS, using library size normalisation.
+#| fig-width: 8
+#| fig-height: 15
+tar_read(fig_de_peak_example_1) 
+```
+
+
+```{r}
+#| label: fig-de-abu-example-1
+#| fig-cap: Total normalised count in the peak shown in @fig-de-peak-example-1
+#| fig-width: 4
+#| fig-height: 4
+tar_read(fig_de_abu_example_1) 
+```
+
 # Resources
 
 ## Interactive data explorers {#sec-explorers}
 
-- [Differential expression](https://shiny.compbio.dundee.ac.uk/mgierlinski/private/hipposeq/de)
-- [Gene set enrichment](https://shiny.compbio.dundee.ac.uk/mgierlinski/private/hipposeq/gsea)
+- [Differential expression](https://shiny.compbio.dundee.ac.uk/mgierlinski/private/h3mecut/de)
+
 
 ## Downloads {#sec-downloads}
 
-- [Differential expression results](https://www.compbio.dundee.ac.uk/user/mgierlinski/hipposeq/tab/de.csv)
-- [Gene set enrichment results](https://www.compbio.dundee.ac.uk/user/mgierlinski/hipposeq/tab/gse.csv)
+```{r}
+#| label: tbl-downloads
+#| tbl-cap: Annotated differential abundance results
+expand_grid(
+  norm = c("libs", "spike"),
+  type = c("broad", "narrow"),
+  model = c("full", "groups")
+) |> 
+  unite(name, c(model, norm, type), remove = FALSE) |>
+  mutate(link = str_glue("[link](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/tab/diffbind_chipseeker_{name}.csv)")) |> 
+  select(-name) |> 
+  mutate(
+    Normalisation = case_match(norm, "libs" ~ "Library size", "spike" ~ "Spike-in"),
+    `Peak type` = case_match(type, "broad" ~ "Broad", "narrow" ~ "Narrow"),
+    `DE model` = case_match(model, "full" ~ "Two factors", "groups" ~ "Separate contrasts")
+  ) |> 
+  select(-c(norm, type, model)) |> 
+  relocate(link, .after = 4) |> 
+  gt() |> 
+  fmt_markdown(columns = link)
+```
 
 ## Code
 

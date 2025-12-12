@@ -118,7 +118,7 @@ plot_picard_duplication <- function(pd, meta) {
 }
 
 
-plot_spikein_ratios <- function(bowtie_sum_merged, meta) {
+plot_spikein_ratios <- function(bowtie_sum_merged, meta, brks = c(0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50)) {
   bowtie_sum_merged |> 
     mutate(
       all_dp = once_drosophila + multi_drosophila,
@@ -133,6 +133,7 @@ plot_spikein_ratios <- function(bowtie_sum_merged, meta) {
     ) +
     geom_beeswarm(size = 2, cex = 3, shape = 21, colour = "grey50") +
     scale_fill_manual(values = okabe_ito_palette) +   
-    scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, NA), trans = "sqrt", breaks = c(1, 2, 5, 10, 20, 40, 60)) +
+    scale_y_log10(breaks = brks, labels = as.character(brks)) +
+    #scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, NA), trans = "sqrt", breaks = c(1, 2, 5, 10, 20, 40, 60)) +
     labs(x = "Group", y = "% drosophila hits")
 }

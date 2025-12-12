@@ -60,12 +60,12 @@ get_functional_terms <- function(config, geneids) {
 }
 
 
-prepare_terms_fenr <- function(terms, all_features = NULL) {
+prepare_terms_fenr <- function(terms, all_features = NULL, feature_name = "id") {
   ontologies <- names(terms)
   
   map(ontologies, function(ont) {
     trm <- terms[[ont]]
-    fenr::prepare_for_enrichment(trm$terms, trm$mapping, all_features = all_features, feature_name = "id")
+    fenr::prepare_for_enrichment(trm$terms, trm$mapping, all_features = all_features, feature_name = feature_name)
   }) |> 
     set_names(ontologies)
 }

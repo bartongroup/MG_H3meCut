@@ -67,9 +67,19 @@ spikein_normalization <- function(dbc) {
   DiffBind::dba.normalize(dbc, normalize = DiffBind::DBA_NORM_LIB, spikein = TRUE)
 }
 
+# AFAIK this doesn't do anything, data seem to be normalised
+# to the library size be default
 libsize_normalization <- function(dbc) {
   DiffBind::dba.normalize(dbc, normalize = DiffBind::DBA_NORM_LIB)
 }
+
+# "fake" normalisation to the total count of 1e7 - effectively removes all normalisations
+# and returns an object with original counts per peak
+no_normalization <- function(dbc, tot_count = 1e7) {
+  ns <- nrow(dbc$samples)
+  DiffBind::dba.normalize(dbc, normalize = DiffBind::DBA_NORM_LIB, library = rep(tot_count, ns))
+}
+
 
 
 # Need spike-in normalized data (slow process)
@@ -124,6 +134,20 @@ de_model <- function(dbc, model) {
   }
 }
 
+extract_bindings <- function(db, pids = NULL) {
+  d <- db |> 
+    DiffBind::dba.peakset(bRetrieve = TRUE) |> 
+    as_tibble() |> 
+    mutate(peak_id = str_glue("{seqnames}:{start}-{end}"), .before = 1) |> 
+    select(-c(seqnames, start, end, width, strand)) |> 
+    pivot_longer(-peak_id, names_to = "sample", values_to = "value")
+  if(!is.null(pids)) {
+    d <- d |> 
+      filter(peak_id %in% pids)
+  }
+  d
+}
+
 extract_de_results <- function(dbc) {
   contrasts <- DiffBind::dba.show(dbc, bContrasts = TRUE) |> 
     as_tibble() |> 
@@ -143,12 +167,15 @@ extract_de_results <- function(dbc) {
       p_value = p.value,
       fdr = FDR
     ) |> 
-    mutate(peak_id = str_glue("{chr}:{start}-{end}"), .before = 1)
+    mutate(
+      log_fc = -log_fc,  # They provide group1 - group2, but we prefer group2 - group1
+      peak_id = str_glue("{chr}:{start}-{end}"), .before = 1
+    )
 }
 
 prepare_de_genes <- function(dec, keep_annot = c("Intron", "Exon", "Promoter (<=1kb)", "3' UTR", "5' UTR")) {
   dec |> 
-    select(id = gene_id, contrast, log_fc, p_value, fdr, annotation) |>
+    select(peak_id, id = gene_id, contrast, log_fc, p_value, fdr, annotation) |>
     filter(!is.na(id) & annotation %in% keep_annot)
 }
 
@@ -165,8 +192,13 @@ read_correct_cache <- function(type = "broad", spike = TRUE) {
 read_cache <- function(type, norm) {
   if(norm == "spike") {
     read_correct_cache(type, spike = TRUE)
-  } else {
+  } else if(norm == "libs") {
     read_correct_cache(type, spike = FALSE) |> 
-      libsize_normalization()
+      libsize_normalization() 
+  } else if(norm == "none") {
+    read_correct_cache(type, spike = FALSE) |> 
+      no_normalization()
+  } else {
+    stop("Huh?")
   }
 }
