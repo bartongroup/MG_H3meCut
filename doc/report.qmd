@@ -381,6 +381,14 @@ The results of this test are shown in @fig-norm-comp. Unfortunately, spike-in no
 
 We note that the large variation in spike-in-normalised data for Me3_48h_Ctrl may be due to (at least) two reasons. First, the spike-ins may have been unreliable, with the amount of Drosophila DNA added varying between samples. However, there is a second possibility. In @fig-norm-comp we see that after spike-in normalisation the total peak counts are stable in iPS_Ctrl but increase with treatment and time, with a large spread at 48 h. It is therefore possible that different replicates responded differently to siRNA and time, leading to genuine differences in total methylation. Unfortunately, we cannot determine which of these two scenarios actually occurred.
 
+::: {.callout-warning}
+
+The large variance in spike-in normalised data, caused either by inconsistent spike-ins or erratic response from treated cells, makes analysis of spike-in normalised data unreliable.
+
+:::
+
+
+
 ```{r}
 #| label: fig-norm-comp
 #| fig-cap: "Comparison of normalisations: (A) raw counts, (B) library size and (C) spike-in. The vertical axis shows the total normalised abundance across all peaks in each sample."
@@ -473,9 +481,16 @@ There are a few cases where broad peak calling detects only a few peaks in a bro
 tar_read(fig_peak_example_2)
 ```
 
+
+::: {.callout-note}
+
+Only broad peak results are shown in the following sections and in the Shiny app. However, all results, including narrow peak results, are available for download in @sec-downloads.
+
+:::
+
 ## Peak annotations
 
-We used to different packages to annotate peaks: *annotatr* and *chipseeker*. Both packages use different approaches and different genomic features for annotation. Ini particular, *chipseeker* includes intergenic regions, while *annotatr* does not. Results of annotations for all peaks are shown in @fig-peak-annotations. Both methods show similar trends, with most peaks located in intronic and intergenic regions. There are no obvious large-scale differences between conditions.
+We used to different packages to annotate peaks: *annotatr* and *chipseeker*. Both packages use different approaches and different genomic features for annotation. In particular, *chipseeker* includes intergenic regions, while *annotatr* does not. Results of annotations for all peaks are shown in @fig-peak-annotations. Both methods show similar trends, with most peaks located in intronic and intergenic regions. There are no obvious large-scale differences between conditions.
 
 ```{r}
 #| label: fig-peak-annotations
@@ -487,7 +502,9 @@ pl2 <- tar_read(fig_chipseeker_broad)
 plot_grid(pl1, pl2, ncol = 1, labels = c("A ", "B"), rel_heights = c(1, 1.2))
 ```
 
+## Assigning genes to peaks
 
+For functional enrichment peaks need to be assigned to genes, which in turn, are annotated with functional terms, like GO, KEGG and Reactome. For this, *chipseeker* was used and a peak was deemed to be "belonging to a gene", when it was located in one of the following regions: Intron, Exon, Promoter (<=1kb), 3' UTR, 5' UTR. Locations farther away from the gene were discarded.
 
 
 
@@ -534,6 +551,25 @@ tar_read(fig_up_down_full_libs_broad)
 #| fig-height: 4
 tar_read(fig_dec_chipseeker_full_libs_broad) 
 ```
+
+@fig-deg-biotype-full-libs-broad shows the distribution of gene biotypes, for differentially binding peaks in genes or their promoters. For comparison, @fig-all-biotype shows the distribution of biotypes for all genes. Please note that 
+
+```{r}
+#| label: fig-deg-biotype-full-libs-broad
+#| fig-cap: "*Chipseeker* gene biotype of differentially abundant peaks, in genes and promoters, in each contrast."
+#| fig-width: 6
+#| fig-height: 4
+tar_read(fig_deg_biotype_full_libs_broad) 
+```
+
+```{r}
+#| label: fig-all-biotype
+#| fig-cap: Distribution of gene biotypes for all genes.
+#| fig-width: 4
+#| fig-height: 4
+tar_read(fig_all_biotype)
+```
+
 
 #### Gene set enrichment
 
@@ -646,6 +682,37 @@ tar_read(gse_tab_full_spike_broad) |>
 ```
 
 
+## A word of warning
+
+Spike-ins introduce a lot of variability in data. This can lead to distorted or even incorrect differential abundance results. One of the sings of issues with differential abundance is the distorted distribution of p-values. If data and model are correct one expects a flat distribution of p-values (data with no effect), with a gradual increase towards low p-values and a peak at the lowest end (data with detected effect). This is exactly what we see in library size normalised data - see @fig-pdist-groups-libs-broad.
+
+
+```{r}
+#| label: fig-pdist-groups-libs-broad
+#| fig-cap: Distribution of p-values for the model with pair-wise contrasts for library size normalisation. The distributions are as expected with good -omics data.
+#| fig-width: 8
+#| fig-height: 6
+tar_read(fig_pdist_groups_libs_broad) 
+```
+
+In contrast, the distribution of p-values for spike-in normalisation, shows in @fig-pdist-groups-spike-broad, shows distorted shapes, indicating problems with data and/or modelling. 
+
+::: {.callout-warning}
+
+The distribution of p-values indicates that results from spike-in normalised data are not reliable.
+
+:::
+
+
+
+```{r}
+#| label: fig-pdist-groups-spike-broad
+#| fig-cap: Distribution of p-values for the model with pair-wise contrasts for spike-in normalisation. The distributions are distorted suggesting issues with data.
+#| fig-width: 8
+#| fig-height: 6
+tar_read(fig_pdist_groups_spike_broad) 
+```
+
 
 
 # Peak examples
@@ -701,7 +768,7 @@ expand_grid(
 ## Code
 
 All analysis in this report has been done in R. The source code can be
-found on [GitHub](https://github.com/bartongroup/MG_HippoSeq).
+found on [GitHub](https://github.com/bartongroup/MG_H3meCut).
 
 
 

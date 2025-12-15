@@ -175,7 +175,7 @@ extract_de_results <- function(dbc) {
 
 prepare_de_genes <- function(dec, keep_annot = c("Intron", "Exon", "Promoter (<=1kb)", "3' UTR", "5' UTR")) {
   dec |> 
-    select(peak_id, id = gene_id, contrast, log_fc, p_value, fdr, annotation) |>
+    select(peak_id, id = gene_id, contrast, log_fc, p_value, fdr, annotation, gene_biotype) |>
     filter(!is.na(id) & annotation %in% keep_annot)
 }
 

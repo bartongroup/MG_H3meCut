@@ -61,6 +61,7 @@ plot_region_ggbio <- function(samples, config, meta, region, peaks_broad, peaks_
       scale_fill_manual(values = okabe_ito_palette) +
       scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(y_min, NA)) +
       geom_segment(data = peak_dat, aes(x = start / 1e6, xend = end / 1e6, y = y, yend = y, colour = type), linewidth = 1.2) +
+      scale_colour_brewer(palette = "Paired") +
       labs(x = str_glue("Position on chr {chr} (Mb)"), y = "Normalised count", fill = "Group", colour = "MACS")
   })
   

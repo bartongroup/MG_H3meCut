@@ -40,23 +40,32 @@ plot_volma <- function(res, point_size, point_alpha, scales = "fixed") {
   r_sel <- r |> filter(sel)
   r_nsel <- r |> filter(!sel)
 
-  rm(res, r)  # Minimise environment for serialisation
+  env <- new.env(parent = globalenv())
+  env$point_size <- point_size
+  env$point_alpha <- point_alpha
+  env$scales <- scales
+  env$r_sel <- r_sel
+  env$r_nsel <- r_nsel
 
-  g <- ggplot() +
-    theme_bw() +
-    theme(
-      panel.grid = element_blank(),
-      legend.position = "none"
-    ) +
-    geom_point(data = r_nsel, aes(x = x, y = y), colour = "grey70",
-               size = point_size, alpha = point_alpha) +
-    facet_wrap( ~ group, scale = scales)
+  with(env, {
+    g <- ggplot() +
+      theme_bw() +
+      theme(
+        panel.grid = element_blank(),
+        legend.position = "none"
+      ) +
+      geom_point(data = r_nsel, aes(x = x, y = y), colour = "grey70",
+                 size = point_size, alpha = point_alpha) +
+      facet_wrap( ~ group, scale = scales)
 
-  if (nrow(r_sel) > 0) {
-    g <- g + geom_point(data = r_sel, aes(x = x, y = y), colour = "black",
-                        size = point_size, alpha = point_alpha)
-  }
-  g
+    if (nrow(r_sel) > 0) {
+      g <- g + geom_point(data = r_sel, aes(x = x, y = y), colour = "black",
+                          size = point_size, alpha = point_alpha)
+    }
+    g
+  })
+
+
 }
 
 plot_ma <- function(res, expr_var = log_cpm, fc_var = log_fc, p_var = p_value, fdr_var = fdr, 
@@ -89,7 +98,7 @@ plot_volcano <- function(res, fc_var = log_fc, p_var = p_value, fdr_var = fdr, g
   } else {
     res <- res |> mutate(sel = id %in% sel_genes)
   }
-  
+
   res |>
     mutate(
       group = {{ group_var }},
@@ -127,22 +136,28 @@ plot_vmp <- function(res, expr_var = log_cpm, fc_var = log_fc, p_var = p_value, 
 
 
 plot_up_down <- function(dec, fdr_limit = 0.01) {
-  dec |> 
+  env <- new.env(parent = globalenv())
+
+  env$d <- dec |> 
     filter(fdr < fdr_limit) |>
     mutate(direction = case_when(
       log_fc > 0 ~ "Up",
       log_fc <= 0 ~ "Down"
     )) |> 
     count(contrast, direction) |> 
-    mutate(n = if_else(direction == "Down", -n, n))  |> 
-  ggplot(aes(x = contrast, y = n, fill = direction)) +
-    th() +
-    theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1)) +
-    geom_col() +
-    geom_hline(yintercept = 0, linewidth = 0.1, alpha = 0.5) +
-    scale_fill_manual(values = c("Up" = "#0072B2", "Down" = "#D55E00")) +
-    #scale_y_continuous(labels = scientific_10) +
-    labs(x = NULL, y = "Number of differentially bound peaks")
+    mutate(n = if_else(direction == "Down", -n, n)) 
+
+  with(env, {
+    d |> 
+      ggplot(aes(x = contrast, y = n, fill = direction)) +
+      th() +
+      theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1)) +
+      geom_col() +
+      geom_hline(yintercept = 0, linewidth = 0.1, alpha = 0.5) +
+      scale_fill_manual(values = c("Up" = "#0072B2", "Down" = "#D55E00")) +
+      #scale_y_continuous(labels = scientific_10) +
+      labs(x = NULL, y = "Number of differentially bound peaks")
+  })
 }
 
 plot_de_peak_distribution <- function(dec, chrom_sizes, fdr_limit = 0.01, chromosomes = c(1:22, "X", "Y")) {
@@ -329,20 +344,27 @@ plot_peak_width_distribution <- function(peaks) {
 
 
 plot_total_bindings <- function(db, meta, y_max = NA) {
-  extract_bindings(db) |> 
+  env <- new.env(parent = globalenv())
+  
+  env$y_max <- y_max
+  env$d <- extract_bindings(db) |> 
     group_by(sample) |> 
     summarise(tot = sum(value) / 1e6) |> 
-    left_join(meta, by = join_by(sample)) |> 
-  ggplot(aes(x = group, y = tot, fill = replicate)) +
-    th() +
-    theme(
-       legend.position = "none",
-       axis.text.x = element_text(angle = 45, hjust = 1)
-    ) +
-    geom_beeswarm(size = 2, cex = 3, shape = 21, colour = "grey50") +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, y_max)) +
-    scale_fill_manual(values = okabe_ito_palette) +
-    labs(x = NULL, y = "Total normalised abundance")
+    left_join(meta, by = join_by(sample))
+
+  with(env, {
+    d |> 
+      ggplot(aes(x = group, y = tot, fill = replicate)) +
+      th() +
+      theme(
+         legend.position = "none",
+         axis.text.x = element_text(angle = 45, hjust = 1)
+      ) +
+      geom_beeswarm(size = 2, cex = 3, shape = 21, colour = "grey50") +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.03)), limits = c(0, y_max)) +
+      scale_fill_manual(values = okabe_ito_palette) +
+      labs(x = NULL, y = "Total normalised abundance")
+  })
 }
 
 plot_all_total_bindings <- function(db_none, db_libs, db_spike, meta, y_max = 60) {
@@ -355,17 +377,66 @@ plot_all_total_bindings <- function(db_none, db_libs, db_spike, meta, y_max = 60
 
 
 plot_peak_bindings <- function(db, pids, meta) {
-  db |> 
-    extract_bindings(pids) |> 
-    left_join(meta, by = join_by(sample)) |> 
-  ggplot(aes(x = group, y = value, fill = replicate)) +
-  th() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  ) +
-  geom_beeswarm(size = 2, cex = 3, shape = 21) +
-  facet_wrap(~peak_id) +
-  scale_fill_manual(values = okabe_ito_palette) +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.03))) +
-  labs(x = NULL, y = "Abundance")
+  env <- new.env(parent = globalenv())
+
+  env$d <- db |>
+    extract_bindings(pids) |>
+    left_join(meta, by = join_by(sample))
+
+  with(env, {
+    d |> 
+      ggplot(aes(x = group, y = value, fill = replicate)) +
+      th() +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1)
+      ) +
+      geom_beeswarm(size = 2, cex = 3, shape = 21) +
+      facet_wrap(~peak_id) +
+      scale_fill_manual(values = okabe_ito_palette) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.03))) +
+      labs(x = NULL, y = "Abundance")
+  })
 }
+
+
+plot_gene_biotype_distribution <- function(deg, fdr_limit = 0.01) {
+  deg |> 
+    filter(fdr < fdr_limit) |> 
+    group_by(contrast) |> 
+    count(gene_biotype) |> 
+    mutate(perc = 100 * n / sum(n))  |> 
+    ungroup() |> 
+  ggplot(aes(x = gene_biotype, y = perc, fill = gene_biotype)) +
+    th() +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    ) +
+    geom_col(colour = "grey60") +
+    scale_fill_manual(values = okabe_ito_palette) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.04))) +
+    facet_wrap(~ contrast) +
+    labs(x = "Gene biotype", y = "Percentage")
+}
+
+
+plot_all_genes_biotype <- function() {
+  txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene::TxDb.Hsapiens.UCSC.hg38.knownGene
+
+  entrez_ids <- names(GenomicFeatures::genes(txdb))  # Entrez IDs in this TxDb
+
+  gene_type <- AnnotationDbi::select(
+    org.Hs.eg.db::org.Hs.eg.db,
+    keys     = entrez_ids,
+    keytype  = "ENTREZID",
+    columns  = c("GENETYPE", "SYMBOL", "GENENAME") 
+  ) |> 
+    as_tibble() |> 
+    select(id = ENTREZID, gene_biotype = GENETYPE) |> 
+    drop_na()
+
+  gene_type |> 
+    distinct(id, gene_biotype) |> 
+    add_column(fdr = 0, contrast = "All genes") |> 
+    plot_gene_biotype_distribution()
+} 

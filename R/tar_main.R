@@ -105,6 +105,7 @@ targets_main <- function() {
         dec = extract_de_results(dbc),
 
         fig_volcano = plot_volcano(dec),
+        fig_pdist = plot_pdist(dec),
         fig_up_down = plot_up_down(dec),
 
         # Annotate DE results
@@ -116,6 +117,7 @@ targets_main <- function() {
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
 
         deg = prepare_de_genes(dec_chipseeker),
+        fig_deg_biotype = plot_gene_biotype_distribution(deg, fdr_limit = 0.01),
         gse = fgsea_all_terms(deg, fterms, rank_expr = "-log_fc * log10(p_value)"),
         gse_tab = tabulate_gsea(gse, gns)
       )
@@ -128,6 +130,8 @@ targets_main <- function() {
  
 
   for_report <- tar_plan(
+    fig_all_biotype = plot_all_genes_biotype(),
+
     db_none_broad = no_normalization(db_libs_broad),
     fig_norm_compare = plot_all_total_bindings(db_none_broad, db_libs_broad, db_spike_broad, metadata3),
 

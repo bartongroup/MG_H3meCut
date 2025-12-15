@@ -16,7 +16,7 @@ write_shiny_file <- function(obj, method = c("qs", "rds")) {
 
 make_dbc_dexdash <- function(dbc, meta, name) {
   abu <- extract_bindings(dbc) |> 
-    rename(id = peak_id)
+    rename(id = peak_id, abundance = value)
   dec <- extract_de_results(dbc) |> 
     rename(id = peak_id, expr = conc)
 
@@ -65,6 +65,8 @@ prepare_for_shiny <- function(dbc_full_libs_broad, dbc_full_spike_broad, dbc_gro
   features <- p2g |> 
     left_join(gn, by = join_by(gene_id)) |>
     mutate(name = id, .after = id)
+  meat <- meta |> 
+    select(sample, group, time_point, treatment, replicate)
  
   dexset <- dexdash::dexdash_list(
     make_dbc_dexdash(dbc_full_libs_broad, meta, "Full libsize"),
