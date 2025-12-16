@@ -7,7 +7,8 @@ targets_main <- function() {
     #structures = biomart_fetch_structures(mart, gene_ids),
     gns = biomart_fetch_genes(mart),
     terms = get_functional_terms(config_annot, gns),
-    fterms = prepare_terms_fenr(terms)
+    fterms = prepare_terms_fenr(terms),
+    rmsk = get_repeat_masker()
   )
 
   setup_experiment <- tar_plan(
@@ -111,8 +112,13 @@ targets_main <- function() {
         # Annotate DE results
         dec_annotatr = annotate_peaks_annotatr(dec, annotations),
         dec_chipseeker = annotate_peaks_chipseeker(dec),
+        dec_rmsk = annotate_peaks_rmsk(dec, rmsk),
+
         fig_dec_annotatr = plot_peak_annotatios(dec_annotatr |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
         fig_dec_chipseeker = plot_peak_annotatios(dec_chipseeker |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
+        fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk, fdr_limit = 0.01),
+        fig_dec_rmsk_all = plot_peak_rmsk(dec_rmsk),
+        tbl_rmsk_stats = rmsk_stats(rmsk, dec_rmsk),
 
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
 

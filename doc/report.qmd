@@ -734,6 +734,53 @@ tar_read(fig_de_peak_example_1)
 tar_read(fig_de_abu_example_1) 
 ```
 
+
+# RepeatMasker elements
+
+RepeatMasker is a curated genome annotation resource that catalogues interspersed repeats and low-complexity sequences across reference genomes. It identifies and classifies repetitive elements by aligning genomic sequences to libraries of known repeat consensus sequences (primarily Repbase and Dfam), and reports their genomic locations together with hierarchical classifications such as class (e.g. LINE, SINE, LTR), family, and element name. The RepeatMasker database, as distributed by UCSC, provides a comprehensive, genome-wide map of transposable elements and other repeats that is widely used for repeat annotation, masking, and downstream genomic analyses.
+
+
+::: {.callout-warning}
+
+Counting peaks in repetitive regions is questionable. With multi-mapping reads, it is not possible to identify their origin, so certain regions might contain "ghost" peaks, consisting of reads originating from a different region, but mapping to an identical sequence. Conversely, some repetitive regions with real methylation targets might not show up in the results, as the *Bowtie2* was set to report only first 10 alignments, so some of the mappings will be missed.
+
+:::
+
+MACS-detected peaks were mapped to the RepeatMasker elements. @fig-dec-rmsk-full-libs-broad shows the top RepeatMasker elements containing at least one MACS peak.
+
+```{r}
+#| label: fig-dec-rmsk-full-libs-broad
+#| fig-cap: Number of RepeatMasker sequences overlapping with broad peaks. (A) shows all detected peaks, (B) the differentially binding peaks for the full model in library size normalisation. Only top 12 RepeatMasker families are shown.
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_dec_rmsk_all_full_libs_broad) 
+pl2 <- tar_read(fig_dec_rmsk_da_full_libs_broad) 
+plot_grid(pl1, pl2, ncol = 2)
+```
+
+
+@tbl-rmsk-stats shows the RepeatMasker families with the highest percentage of sequences containing MACS peaks (all peaks included).
+
+```{r}
+#| label: tbl-rmsk-stats
+#| tbl-cap: Percentage of RepeatMasker elements containing at least one broad peak. Top 20 elements are shown.
+tar_read(tbl_rmsk_stats_full_libs_broad) |> 
+  relocate(median_width, .after = n_rmask) |> 
+  rename(
+    `RepeatMasker family` = rep_fam,
+    `Number of RMF elements in database` = n_rmask,
+    `Percentage of RMF sequences with peaks` = perc,
+    `Mean number of peaks per RMF sequence` = mean_n_peaks,
+    `Median RMF width` = median_width
+  ) |> 
+  head(20) |> 
+  gt() |> 
+  fmt_number(
+    columns = c(4, 5),
+    n_sigfig = 3
+  )
+```
+
 # Resources
 
 ## Interactive data explorers {#sec-explorers}

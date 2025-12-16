@@ -213,20 +213,20 @@ plot_number_of_peaks <- function(peaks, meta) {
 }
 
 
-plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample") {
+plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample", annot_var = "annotation") {
   env <- new.env(parent = globalenv())
   env$ncol <- ncol
   env$group_var <- group_var
+  env$annot_var = annot_var
 
   env$d <- an |> 
-    mutate(grp = get(group_var)) |> 
-    distinct(grp, peak_id, annotation) |> 
-    count(grp, annotation) |> 
+    mutate(grp = get(group_var), ann = get(annot_var)) |> 
+    distinct(grp, peak_id, ann) |> 
+    count(grp, ann) |> 
     mutate(n = n / 1000)
-
   with(env, {
     d |> 
-      ggplot(aes(x = annotation, y = n, fill = annotation)) +
+      ggplot(aes(x = ann, y = n, fill = ann)) +
       th() +
       theme(
         legend.position = "none",
@@ -237,6 +237,47 @@ plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample") {
       scale_fill_brewer(palette = "Paired") +
       scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scientific_10) +
       labs(x = NULL, y = "Count (thousands)")
+  })
+}
+
+
+plot_peak_rmsk <- function(dec, fdr_limit = NULL, ncol = 1, top_n = 12) {
+  env <- new.env(parent = globalenv())
+  env$ncol <- ncol
+
+  
+  if(!is.null(fdr_limit)) {
+    # FDR selection per contrast
+    dc <- dec |> 
+      filter(fdr < fdr_limit)
+  } else {
+    # All peaks, fake contrast for display
+    ctrs <- dec$contrast |> unique()
+    dc <- dec |> 
+      filter(contrast == ctrs[1]) |> 
+      mutate(contrast = "All peaks")
+  }  
+
+  env$dc <- dc |> 
+    distinct(contrast, peak_id, rep_fam) |> 
+    count(contrast, rep_fam) |> 
+    arrange(desc(n)) |> 
+    mutate(f = fct_reorder(rep_fam, -n)) |> 
+    group_split(contrast)  |> 
+    map(\(w) head(w, top_n)) |> 
+    list_rbind()
+
+  with(env, {
+    dc |> 
+      ggplot(aes(x = f, y = n)) +
+      th() +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1)
+      ) +
+      geom_col(width = 0.8) +
+      facet_wrap(~contrast, ncol = ncol, scales = "free_y") +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scientific_10) +
+      labs(x = NULL, y = "Count")
   })
 }
 

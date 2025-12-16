@@ -97,6 +97,29 @@ annotate_peaks_annotatr <- function(bed, annotations) {
 }
 
 
+annotate_peaks_rmsk <- function(bed, rmsk) {
+  gr <- makeGRangesFromDataFrame(bed, keep.extra.columns = TRUE)
+  reps <- makeGRangesFromDataFrame(rmsk, keep.extra.columns = TRUE)
+
+  an <- annotatr::annotate_regions(gr, reps) |> 
+    as_tibble() |> 
+    clean_names()  |> 
+    rename(
+      chr = seqnames,
+      rep_id = annot_rep_id,
+      rep_chr = annot_seqnames,
+      rep_start = annot_start,
+      rep_end = annot_end,
+      rep_width = annot_width,
+      rep_strand = annot_strand,
+      rep_name = annot_rep_name,
+      rep_class = annot_rep_class,
+      rep_family = annot_rep_family,
+      rep_fam = annot_rep_fam
+    ) |> 
+    relocate(peak_id, .before = 1)
+}
+
 ######################################################################
 
 build_human_annotations <- function() {
@@ -156,4 +179,29 @@ combine_hits_rbp <- function(annot) {
     list_rbind() |> 
     rename(chr = seqnames) |> 
     relocate(peak_id, .before = 1)
+}
+
+
+######################################################################
+
+get_repeat_masker <- function() {
+  asm <- "hg38"
+
+  file_path <- str_glue("https://hgdownload.soe.ucsc.edu/goldenPath/{asm}/database/rmsk.txt.gz")
+  cols <- c(
+    "bin","swScore","milliDiv","milliDel","milliIns",
+    "genoName","genoStart","genoEnd","genoLeft",
+    "strand","repName","repClass","repFamily",
+    "repStart","repEnd","repLeft","id"
+  )
+  r <- read_tsv(file_path, col_names = cols, show_col_types = FALSE)
+
+  r |> select(chr = genoName, start = genoStart, end = genoEnd, strand,
+           rep_name = repName, rep_class = repClass, rep_family = repFamily) |> 
+    mutate(
+      rep_id = sprintf("R%07d", row_number()),
+      chr = str_remove(chr, "chr"),
+      across(c(start, end), as.integer)
+    ) |> 
+    unite(rep_fam, c(rep_class, rep_family), sep = ":", remove = FALSE)
 }

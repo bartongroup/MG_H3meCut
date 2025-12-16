@@ -70,3 +70,41 @@ write_dec <- function(dec, name) {
     mutate(across(where(is.double), ~signif(.x, 4))) |> 
     write_csv(fname)
 }
+
+
+rmsk_stats <- function(rmsk, dec) {
+  dc <- dec |> 
+    distinct(peak_id, rep_id) |> 
+    count(rep_id)
+
+  fw <- rmsk |> 
+    group_by(rep_fam) |> 
+    mutate(width = end - start + 1) |> 
+    summarise(median_width = median(width)) 
+
+  rm <- rmsk |>
+    left_join(dc, by = join_by(rep_id)) |> 
+    mutate(n = replace_na(n, 0))
+
+  rn <- rm |> 
+    group_by(rep_fam) |> 
+    summarise(mean_n_peaks = mean(n))
+
+  rp <- rm |> 
+    mutate(with_peak = if_else(n > 0, "Y", "N")) |> 
+    group_by(rep_fam, with_peak) |> 
+    summarise(n = n()) |> 
+    pivot_wider(id_cols = rep_fam, names_from = with_peak, values_from = n) |> 
+    drop_na() |> 
+    mutate(
+      n_rmask = Y + N,
+      perc = 100 * Y / n_rmask
+    ) |> 
+    select(-c(Y, N)) |> 
+    arrange(desc(perc)) |> 
+    ungroup()
+
+  rp |> 
+    left_join(rn, by = join_by(rep_fam)) |> 
+    left_join(fw, by = join_by(rep_fam))
+}
