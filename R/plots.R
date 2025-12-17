@@ -241,11 +241,11 @@ plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample", annot_var =
 }
 
 
-plot_peak_rmsk <- function(dec, fdr_limit = NULL, ncol = 1, top_n = 12) {
+plot_peak_rmsk <- function(dec, fdr_limit = NULL, ncol = 1, top_n = 16) {
   env <- new.env(parent = globalenv())
   env$ncol <- ncol
 
-  
+ 
   if(!is.null(fdr_limit)) {
     # FDR selection per contrast
     dc <- dec |> 
@@ -276,7 +276,7 @@ plot_peak_rmsk <- function(dec, fdr_limit = NULL, ncol = 1, top_n = 12) {
       ) +
       geom_col(width = 0.8) +
       facet_wrap(~contrast, ncol = ncol, scales = "free_y") +
-      scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scientific_10) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scales::comma) +
       labs(x = NULL, y = "Count")
   })
 }

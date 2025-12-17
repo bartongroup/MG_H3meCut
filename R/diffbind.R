@@ -134,6 +134,13 @@ de_model <- function(dbc, model) {
   }
 }
 
+extract_consensus <- function(db) {
+  db |> 
+    DiffBind::dba.peakset(bRetrieve = TRUE) |> 
+    as_tibble() |> 
+    select(chr = seqnames, start, end, width)
+}
+
 extract_bindings <- function(db, pids = NULL) {
   d <- db |> 
     DiffBind::dba.peakset(bRetrieve = TRUE) |> 

@@ -40,7 +40,7 @@ read_peak_files <- function(config, meta, format = c("narrow", "broad")) {
 }
 
 
-plot_peak_distribution_sample <- function(npeaks, smpl, chrom_sizes, bin_size = 1, bar_size = 1.2, chromosomes = c(1:22, "X", "Y")) {  
+plot_peak_distribution_sample <- function(npeaks, smpl, chrom_sizes, bin_size = 1, bar_size = 1.2, y_scale = 0.8, chromosomes = c(1:22, "X", "Y")) {  
   cs <- chrom_sizes |> 
     filter(chr != "MT") |> 
     mutate(
@@ -65,8 +65,8 @@ plot_peak_distribution_sample <- function(npeaks, smpl, chrom_sizes, bin_size = 
     ) |> 
     ungroup() |> 
     mutate(
-      s = s / max(s) * 0.8,
-      n = n / max(n) * 0.8
+      s = s / max(s) * y_scale,
+      n = n / max(n) * y_scale
     )
   
   ggplot() +

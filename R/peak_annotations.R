@@ -98,6 +98,9 @@ annotate_peaks_annotatr <- function(bed, annotations) {
 
 
 annotate_peaks_rmsk <- function(bed, rmsk) {
+  if(!("peak_id" %in% colnames(bed)))
+    bed <- bed |> mutate(peak_id = str_glue("{chr}:{start}-{end}"))
+  
   gr <- makeGRangesFromDataFrame(bed, keep.extra.columns = TRUE)
   reps <- makeGRangesFromDataFrame(rmsk, keep.extra.columns = TRUE)
 
@@ -117,7 +120,8 @@ annotate_peaks_rmsk <- function(bed, rmsk) {
       rep_family = annot_rep_family,
       rep_fam = annot_rep_fam
     ) |> 
-    relocate(peak_id, .before = 1)
+    relocate(peak_id, .before = 1) |> 
+    relocate(rep_id, .before = rep_chr)
 }
 
 ######################################################################

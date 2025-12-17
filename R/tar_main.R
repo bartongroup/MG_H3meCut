@@ -118,7 +118,6 @@ targets_main <- function() {
         fig_dec_chipseeker = plot_peak_annotatios(dec_chipseeker |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
         fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk, fdr_limit = 0.01),
         fig_dec_rmsk_all = plot_peak_rmsk(dec_rmsk),
-        tbl_rmsk_stats = rmsk_stats(rmsk, dec_rmsk),
 
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
 
@@ -137,6 +136,13 @@ targets_main <- function() {
 
   for_report <- tar_plan(
     fig_all_biotype = plot_all_genes_biotype(),
+
+    consensus_peaks = db_libs_broad |> extract_consensus(),
+    tbl_rmsk_peaks =  annotate_peaks_rmsk(consensus_peaks, rmsk),
+    #tbl_rmsk_stats = rmsk_stats(rmsk, consensus_peaks, n_perm = 50, n_top = 20),
+    tbl_rmsk_stats = readr::read_rds("cache/tbl_rmsk_stats.rds"),
+
+    sav_rmsk_peaks = tbl_rmsk_peaks |> readr::write_csv("tab/rmask_peaks.csv"),
 
     db_none_broad = no_normalization(db_libs_broad),
     fig_norm_compare = plot_all_total_bindings(db_none_broad, db_libs_broad, db_spike_broad, metadata3),

@@ -72,39 +72,85 @@ write_dec <- function(dec, name) {
 }
 
 
-rmsk_stats <- function(rmsk, dec) {
-  dc <- dec |> 
-    distinct(peak_id, rep_id) |> 
-    count(rep_id)
 
-  fw <- rmsk |> 
-    group_by(rep_fam) |> 
-    mutate(width = end - start + 1) |> 
-    summarise(median_width = median(width)) 
-
-  rm <- rmsk |>
-    left_join(dc, by = join_by(rep_id)) |> 
-    mutate(n = replace_na(n, 0))
-
-  rn <- rm |> 
-    group_by(rep_fam) |> 
-    summarise(mean_n_peaks = mean(n))
-
-  rp <- rm |> 
-    mutate(with_peak = if_else(n > 0, "Y", "N")) |> 
-    group_by(rep_fam, with_peak) |> 
-    summarise(n = n()) |> 
-    pivot_wider(id_cols = rep_fam, names_from = with_peak, values_from = n) |> 
-    drop_na() |> 
-    mutate(
-      n_rmask = Y + N,
-      perc = 100 * Y / n_rmask
-    ) |> 
-    select(-c(Y, N)) |> 
-    arrange(desc(perc)) |> 
-    ungroup()
-
-  rp |> 
-    left_join(rn, by = join_by(rep_fam)) |> 
-    left_join(fw, by = join_by(rep_fam))
+make_gr_regions <- function(df, chromosomes = c(1:22, "X", "Y")) {
+  df |> 
+    distinct(chr, start, end) |> 
+    filter(chr %in% chromosomes) |> 
+    mutate(chr = paste0("chr", chr)) |> 
+    makeGRangesFromDataFrame()
 }
+
+
+random_overlap_test <- function(reg1, reg2, n_perm = 300) {
+  pt <- regioneR::overlapPermTest(
+    A = r1,
+    B = r2,
+    ntimes = n_perm,
+    force.parallel = TRUE
+  ) |> 
+    suppressMessages() |> 
+    suppressWarnings()
+}
+
+num_overlaps_once <- function(A, B) {
+  regioneR::numOverlaps(A, B, count.once = TRUE)
+}
+
+rmsk_stats <- function(rmsk, pks, n_perm = 100, n_top = 20) {
+  gr_pk <- make_gr_regions(pks)
+
+  fams <- rmsk$rep_fam |> 
+    unique()
+
+  rc <- map(fams, function(fm) {
+    gr_rm <- rmsk |> 
+      filter(rep_fam == fm) |> 
+      make_gr_regions()
+    ov <- countOverlaps(gr_rm, gr_pk)
+    n_over <- sum(ov > 0)
+    tibble(
+      rep_fam = fm,
+      n_rmask = length(gr_rm),
+      n_over = n_over,
+      perc = 100 * n_over / length(gr_rm),
+      median_width = median(width(gr_rm))
+    )
+  }) |> 
+    list_rbind() |> 
+    arrange(desc(perc)) 
+
+  perm <- map(1:n_top, function(i) {
+    r <- rc[i, ]
+    gr_rm <- rmsk |> 
+      filter(rep_fam == r$rep_fam) |> 
+      make_gr_regions()
+
+    print(paste("Permutation for", r$rep_fam))
+    pt <- regioneR::permTest(
+      A = gr_rm,
+      B = gr_pk,
+      randomize.function = regioneR::randomizeRegions,
+      evaluate.function = num_overlaps_once,
+      alternative = "greater",
+      ntimes = n_perm,
+      force.parallel = TRUE
+    ) |> 
+      suppressMessages() |> 
+      suppressWarnings()
+
+    tibble(
+      rep_fam = r$rep_fam,
+      p_value = pt$num_overlaps_once$pval,
+      perm_over = pt$num_overlaps_once$permuted |> mean()
+    )
+  }) |> 
+    list_rbind()
+
+  rc |> 
+    left_join(perm, by = join_by(rep_fam))
+}
+
+
+
+

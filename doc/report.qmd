@@ -737,20 +737,22 @@ tar_read(fig_de_abu_example_1)
 
 # RepeatMasker elements
 
-RepeatMasker is a curated genome annotation resource that catalogues interspersed repeats and low-complexity sequences across reference genomes. It identifies and classifies repetitive elements by aligning genomic sequences to libraries of known repeat consensus sequences (primarily Repbase and Dfam), and reports their genomic locations together with hierarchical classifications such as class (e.g. LINE, SINE, LTR), family, and element name. The RepeatMasker database, as distributed by UCSC, provides a comprehensive, genome-wide map of transposable elements and other repeats that is widely used for repeat annotation, masking, and downstream genomic analyses.
+*RepeatMasker* is a curated genome annotation resource that catalogues interspersed repeats and low-complexity sequences across reference genomes. It identifies and classifies repetitive elements by aligning genomic sequences to libraries of known repeat consensus sequences (primarily Repbase and Dfam), and reports their genomic locations together with hierarchical classifications consisting of a class (e.g. LINE, SINE, LTR), family (L1, L2), and element name. The RepeatMasker database, as distributed by UCSC, provides a comprehensive, genome-wide map of transposable elements and other repeats that is widely used for repeat annotation, masking, and downstream genomic analyses.
 
+In this Section we report results per *RepeatMasker* family, with class name included. E.g. a family L1 in class LINE is reported as LINE:L1.
 
 ::: {.callout-warning}
 
-Counting peaks in repetitive regions is questionable. With multi-mapping reads, it is not possible to identify their origin, so certain regions might contain "ghost" peaks, consisting of reads originating from a different region, but mapping to an identical sequence. Conversely, some repetitive regions with real methylation targets might not show up in the results, as the *Bowtie2* was set to report only first 10 alignments, so some of the mappings will be missed.
-
+Peak counts in repetitive regions should be interpreted with caution. Because *bowtie2* was run with multi-mapping enabled (-k 10), reads originating from repetitive sequences cannot be uniquely assigned to a single genomic location. As a result, some peaks in repetitive regions may be artefactual (“ghost” peaks), formed by reads that actually originate elsewhere but map to identical sequences. Conversely, genuine targets in repetitive regions may be under-represented or missed entirely, since only the first 10 possible alignments were reported and additional valid mappings were discarded.
 :::
 
-MACS-detected peaks were mapped to the RepeatMasker elements. @fig-dec-rmsk-full-libs-broad shows the top RepeatMasker elements containing at least one MACS peak.
+## Peaks per RepeatMasker family sequence
+
+@fig-dec-rmsk-full-libs-broad shows the count of MACS peaks mapping to a *RepeatMasker* sequences in each family. Not surprisingly, the highest counts come from most abundant *RepeatMasker* families.
 
 ```{r}
 #| label: fig-dec-rmsk-full-libs-broad
-#| fig-cap: Number of RepeatMasker sequences overlapping with broad peaks. (A) shows all detected peaks, (B) the differentially binding peaks for the full model in library size normalisation. Only top 12 RepeatMasker families are shown.
+#| fig-cap: Number of broad peaks overlapping with the RepeatMasker (RM) sequences, per RM family. (A) shows results for all detected peaks, (B) only for the differentially binding peaks for the full model in library size normalisation. Only top 16 RM families are shown.
 #| fig-width: 8
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_rmsk_all_full_libs_broad) 
@@ -758,25 +760,38 @@ pl2 <- tar_read(fig_dec_rmsk_da_full_libs_broad)
 plot_grid(pl1, pl2, ncol = 2)
 ```
 
+## *RepeatMasker* family sequences containing MACS peaks
 
-@tbl-rmsk-stats shows the RepeatMasker families with the highest percentage of sequences containing MACS peaks (all peaks included).
+@tbl-rmsk-stats shows the *RepeatMasker* families with the highest percentage of sequences containing MACS peaks (all consensus peaks were considered). Telomeric (telo) and centromeric (centr, acro) satellite repeats are strongly enriched in K9 peaks.
+
+A permutation test was performed to assess the statistical significance of the association. Both *RepeatMasker* sequences and MACS peaks were randomly distributed along all chromosomes and the overlap count was found. This was repeated 50 times (a rather small number of repeats due you time constraints - limiting the reported p-values to ~0.02). The mean overlap count, representing the expected count under the null hypothesis of no association between peaks and *RepeatMasker*, was found together with the corresponding p-value.   
 
 ```{r}
 #| label: tbl-rmsk-stats
-#| tbl-cap: Percentage of RepeatMasker elements containing at least one broad peak. Top 20 elements are shown.
-tar_read(tbl_rmsk_stats_full_libs_broad) |> 
-  relocate(median_width, .after = n_rmask) |> 
-  rename(
+#| tbl-cap: Percentage of *RepeatMasker* elements in a given family, containing at least one broad peak. RMF stands for *RepeatMasker* family. Only top 20 families are shown. The expected number of the RMF sequences containing a MACS peak and the corresponding p-values were calculated under the null hypothesis of the randomly distributed peaks and RM sequences, using a permutation test. Due to time constraints, tests with only 50 permutations were carried out, which resulted in the smallest possible p-value of 0.019. A p-value showing 0.019 constitutes an upper limit, so the actual p-values in these instances are likely smaller.
+tb <- tar_read(tbl_rmsk_stats) |> 
+  mutate(n_not_over = n_rmask - n_over)
+tot_rmask <- sum(tb$n_rmask)
+tot_over = sum(tb$n_over)
+tot_not_over = sum(tb$n_not_over)
+
+tb |> mutate(
+  or = (n_over / n_not_over) / ((tot_over - n_over) / (tot_not_over - n_not_over))
+) |>  
+  select(
     `RepeatMasker family` = rep_fam,
-    `Number of RMF elements in database` = n_rmask,
-    `Percentage of RMF sequences with peaks` = perc,
-    `Mean number of peaks per RMF sequence` = mean_n_peaks,
-    `Median RMF width` = median_width
+    `Median RMF sequence width` = median_width,
+    `Number of RMF sequences in database` = n_rmask,
+    `Number of RMF sequences with K9 peaks` = n_over,
+    `% RMF sequences with K9 peaks` = perc,
+    `Expected number of RMF seq with peaks from random` = perm_over,
+    `Odds ratio` = or,
+    `p-value` = p_value
   ) |> 
   head(20) |> 
   gt() |> 
   fmt_number(
-    columns = c(4, 5),
+    columns = c(5, 6, 7, 8),
     n_sigfig = 3
   )
 ```
@@ -811,6 +826,8 @@ expand_grid(
   gt() |> 
   fmt_markdown(columns = link)
 ```
+
+ - [Repeat Masker - consensus peaks mapping](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/tab/rmask_peaks.csv)
 
 ## Code
 
