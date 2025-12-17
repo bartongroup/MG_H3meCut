@@ -264,20 +264,39 @@ plot_peak_rmsk <- function(dec, fdr_limit = NULL, ncol = 1, top_n = 16) {
     arrange(desc(n)) |> 
     mutate(f = fct_reorder(rep_fam, -n)) |> 
     group_split(contrast)  |> 
-    map(\(w) head(w, top_n)) |> 
+    map(function(w) {
+      w |> 
+        mutate(tot = sum(n)) |> 
+        select(contrast, f, n, tot) |> 
+        nest(data = c(n, tot)) |> 
+        mutate(
+          tst = map(data, ~prop.test(.x$n, .x$tot)),
+          tidied = map(tst, tidy)
+        ) |> 
+        unnest(tidied) |> 
+        unnest(data) |> 
+        select(-tst) |> 
+        head(top_n)
+    }) |> 
     list_rbind()
+
+  if(nrow(dc) == 0)
+    return(NULL)
 
   with(env, {
     dc |> 
-      ggplot(aes(x = f, y = n)) +
+      ggplot(aes(x = f, y = estimate, fill = contrast)) +
       th() +
       theme(
-        axis.text.x = element_text(angle = 45, hjust = 1)
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "top"
       ) +
-      geom_col(width = 0.8) +
-      facet_wrap(~contrast, ncol = ncol, scales = "free_y") +
+      geom_col(width = 0.8, position = position_dodge(width = 0.8)) +
+      geom_errorbar(aes(ymin = conf.low, ymax = conf.high), position = position_dodge(width = 0.8), width = 0.2) +
+      scale_fill_manual(values = okabe_ito_palette) +
+      #facet_wrap(~contrast, ncol = ncol, scales = "fixed") +
       scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scales::comma) +
-      labs(x = NULL, y = "Count")
+      labs(x = NULL, y = "Proportion of counts")
   })
 }
 

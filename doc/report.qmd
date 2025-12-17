@@ -735,7 +735,7 @@ tar_read(fig_de_abu_example_1)
 ```
 
 
-# RepeatMasker elements
+# RepeatMasker
 
 *RepeatMasker* is a curated genome annotation resource that catalogues interspersed repeats and low-complexity sequences across reference genomes. It identifies and classifies repetitive elements by aligning genomic sequences to libraries of known repeat consensus sequences (primarily Repbase and Dfam), and reports their genomic locations together with hierarchical classifications consisting of a class (e.g. LINE, SINE, LTR), family (L1, L2), and element name. The RepeatMasker database, as distributed by UCSC, provides a comprehensive, genome-wide map of transposable elements and other repeats that is widely used for repeat annotation, masking, and downstream genomic analyses.
 
@@ -752,13 +752,22 @@ Peak counts in repetitive regions should be interpreted with caution. Because *b
 
 ```{r}
 #| label: fig-dec-rmsk-full-libs-broad
-#| fig-cap: Number of broad peaks overlapping with the RepeatMasker (RM) sequences, per RM family. (A) shows results for all detected peaks, (B) only for the differentially binding peaks for the full model in library size normalisation. Only top 16 RM families are shown.
-#| fig-width: 8
-#| fig-height: 4
+#| fig-cap: Normalised number of broad peaks overlapping with the RepeatMasker (RM) sequences, per RM family. (A) shows results for all detected peaks, (B) only for the differentially binding peaks for the full model in library size normalisation. Error bars are 95% confidence intervals of a proportion. Only top 16 RM families are shown.
+#| fig-width: 6
+#| fig-height: 10
 pl1 <- tar_read(fig_dec_rmsk_all_full_libs_broad) 
 pl2 <- tar_read(fig_dec_rmsk_da_full_libs_broad) 
-plot_grid(pl1, pl2, ncol = 2)
+plot_grid(pl1, pl2, ncol = 1)
 ```
+
+```{r}
+#| label: fig-dec-rmsk-groups-libs-broad
+#| fig-cap: As in @fig-dec-rmsk-full-libs-broad, but for the pairwise contrasts.
+#| fig-width: 8
+#| fig-height: 5
+tar_read(fig_dec_rmsk_da_groups_libs_broad) 
+```
+
 
 ## *RepeatMasker* family sequences containing MACS peaks
 

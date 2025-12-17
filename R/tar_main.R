@@ -116,7 +116,7 @@ targets_main <- function() {
 
         fig_dec_annotatr = plot_peak_annotatios(dec_annotatr |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
         fig_dec_chipseeker = plot_peak_annotatios(dec_chipseeker |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
-        fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk, fdr_limit = 0.01),
+        fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk |> dplyr::filter(contrast %in% c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl", "iPS_SETDB1-iPS_Ctrl", "48h-iPS", "SETDB1-Ctrl")), fdr_limit = 0.01),
         fig_dec_rmsk_all = plot_peak_rmsk(dec_rmsk),
 
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
