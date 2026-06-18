@@ -490,21 +490,32 @@ Only broad peak results are shown in the following sections and in the Shiny app
 
 ## Peak annotations
 
-We used to different packages to annotate peaks: *annotatr* and *chipseeker*. Both packages use different approaches and different genomic features for annotation. In particular, *chipseeker* includes intergenic regions, while *annotatr* does not. Results of annotations for all peaks are shown in @fig-peak-annotations. Both methods show similar trends, with most peaks located in intronic and intergenic regions. There are no obvious large-scale differences between conditions.
+We used to different packages to annotate peaks: *annotatr* and *ChIPseeker*. Both packages use different approaches and different genomic features for annotation. In particular, *ChIPseeker* includes intergenic regions, while *annotatr* does not. Also, *ChIPseeker* removes redundant hits (peak spanning multiple features, e.g. promoter-exon-intron; parallel annotations from alternative transcripts), while *annotatr* provides all redundant hits. Hence, *annotatr* results were reduced by using canonical transcripts only.
+
+Results of annotations for all peaks are shown in @fig-peak-annotations. A set of 100,000 randomly located peaks with widths randomly drawn from the original data was used for comparison. Both methods show similar trends, with most peaks located in intronic and intergenic regions. There are no obvious large-scale differences between conditions.
 
 ```{r}
 #| label: fig-peak-annotations
-#| fig-cap: Peak annotations using (A) *annotatr* package and (B) *chipseeker* package, for broad peaks.
+#| fig-cap: Peak annotations of top 30,000 peaks using (A) *annotatr* package and (B) *ChIPseeker* package, for broad peaks. The last bar shows annotations of 100,000 randomly located peaks with widths randomly drawn from the original data.
 #| fig-width: 8
-#| fig-height: 14
-pl1 <- tar_read(fig_annotatr_broad)
-pl2 <- tar_read(fig_chipseeker_broad)
-plot_grid(pl1, pl2, ncol = 1, labels = c("A ", "B"), rel_heights = c(1, 1.2))
+#| fig-height: 4
+pl1 <- tar_read(fig_groups_annotatr_broad)
+pl2 <- tar_read(fig_groups_chipseeker_broad)
+plot_grid(pl1, pl2, nrow = 1, labels = c("A ", "B"), rel_widths = c(1, 1.1)) 
+```
+
+*ChIPseeker* provided, among other annotations, distance to the nearest TSS. @fig-peaks-tss shows the distributions of these distances. This figure strongly suggests that our peaks are mostly randomly distributed.
+
+```{r}
+#| label: fig-peaks-tss
+#| fig-cap: Distance to the nearest TSS according to *ChIPseeker* annotations in four conditions, using broad peaks. Only distances less than ±300 bp from the TSS are shown.
+#| out.width: 50%
+knitr::include_graphics("images/groups_tss.png") 
 ```
 
 ## Assigning genes to peaks
 
-For functional enrichment peaks need to be assigned to genes, which in turn, are annotated with functional terms, like GO, KEGG and Reactome. For this, *chipseeker* was used and a peak was deemed to be "belonging to a gene", when it was located in one of the following regions: Intron, Exon, Promoter (<=1kb), 3' UTR, 5' UTR. Locations farther away from the gene were discarded.
+For functional enrichment peaks need to be assigned to genes, which in turn, are annotated with functional terms, like GO, KEGG and Reactome. For this, *ChIPseeker* was used and a peak was deemed to be "belonging to a gene", when it was located in one of the following regions: Intron, Exon, Promoter (<=1kb), 3' UTR, 5' UTR. Locations farther away from the gene were discarded.
 
 
 
@@ -542,12 +553,12 @@ tar_read(fig_up_down_full_libs_broad)
 
 #### Annotation of differentially binding peaks
 
-@fig-dec-chipseeker-full-libs-broad shows the results of *ChipSeeker* annotation of the differentially binding peaks.
+@fig-dec-chipseeker-full-libs-broad shows the results of *ChIPseeker* annotation of the differentially binding peaks.
 
 ```{r}
 #| label: fig-dec-chipseeker-full-libs-broad
-#| fig-cap: "*Chipseeker* annotations of differentially abundant peaks in each contrast."
-#| fig-width: 6
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast."
+#| fig-width: 3.5
 #| fig-height: 4
 tar_read(fig_dec_chipseeker_full_libs_broad) 
 ```
@@ -556,7 +567,7 @@ tar_read(fig_dec_chipseeker_full_libs_broad)
 
 ```{r}
 #| label: fig-deg-biotype-full-libs-broad
-#| fig-cap: "*Chipseeker* gene biotype of differentially abundant peaks, in genes and promoters, in each contrast."
+#| fig-cap: "*ChIPseeker* gene biotype of differentially abundant peaks, in genes and promoters, in each contrast."
 #| fig-width: 6
 #| fig-height: 4
 tar_read(fig_deg_biotype_full_libs_broad) 
@@ -591,7 +602,7 @@ tar_read(gse_tab_full_libs_broad) |>
 
 ### Model with pair-wise contrasts
 
-The design included pairwise comparison between each condition.
+The design included selected pairwise comparison between conditions.
 
 ```{r}
 #| label: fig-volcano-groups-libs-broad
@@ -613,8 +624,8 @@ tar_read(fig_up_down_groups_libs_broad)
 
 ```{r}
 #| label: fig-dec-chipseeker-groups-libs-broad
-#| fig-cap: "*Chipseeker* annotations of differentially abundant peaks in each contrast."
-#| fig-width: 8
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast."
+#| fig-width: 5
 #| fig-height: 5
 tar_read(fig_dec_chipseeker_groups_libs_broad) 
 ```
@@ -660,8 +671,8 @@ tar_read(fig_up_down_full_spike_broad)
 
 ```{r}
 #| label: fig-dec-chipseeker-spike-libs-broad
-#| fig-cap: "*Chipseeker* annotations of differentially abundant peaks in each contrast."
-#| fig-width: 6
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast."
+#| fig-width: 3
 #| fig-height: 4
 tar_read(fig_dec_chipseeker_full_spike_broad) 
 ```
@@ -751,6 +762,16 @@ Peak counts in repetitive regions should be interpreted with caution. Because *b
 @fig-dec-rmsk-full-libs-broad shows the count of MACS peaks mapping to a *RepeatMasker* sequences in each family. Not surprisingly, the highest counts come from most abundant *RepeatMasker* families.
 
 ```{r}
+#| label: fig-groups-rmsk-broad
+#| fig-cap: RepeatMasker categories in broad peaks (A) the top 30,000 MACS peaks, per condition, (B) the differentially binding peaks using the pairwise model with library size normalisation.
+#| fig-width: 7
+#| fig-height: 4
+pl1 <- tar_read(fig_groups_rmsk_broad)
+pl2 <- tar_read(fig_dec_rmsk_groups_libs_broad)
+plot_grid(pl1, pl2, ncol = 2, rel_widths = c(1, 1))
+```
+
+```{r}
 #| label: fig-dec-rmsk-full-libs-broad
 #| fig-cap: Normalised number of broad peaks overlapping with the RepeatMasker (RM) sequences, per RM family. (A) shows results for all detected peaks, (B) only for the differentially binding peaks for the full model in library size normalisation. Error bars are 95% confidence intervals of a proportion. Only top 16 RM families are shown.
 #| fig-width: 6
@@ -826,9 +847,9 @@ expand_grid(
   mutate(link = str_glue("[link](https://www.compbio.dundee.ac.uk/user/mgierlinski/h3mecut/tab/diffbind_chipseeker_{name}.csv)")) |> 
   select(-name) |> 
   mutate(
-    Normalisation = case_match(norm, "libs" ~ "Library size", "spike" ~ "Spike-in"),
-    `Peak type` = case_match(type, "broad" ~ "Broad", "narrow" ~ "Narrow"),
-    `DE model` = case_match(model, "full" ~ "Two factors", "groups" ~ "Separate contrasts")
+    Normalisation = recode_values(norm, "libs" ~ "Library size", "spike" ~ "Spike-in"),
+    `Peak type` = recode_values(type, "broad" ~ "Broad", "narrow" ~ "Narrow"),
+    `DE model` = recode_values(model, "full" ~ "Two factors", "groups" ~ "Separate contrasts")
   ) |> 
   select(-c(norm, type, model)) |> 
   relocate(link, .after = 4) |> 

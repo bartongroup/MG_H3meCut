@@ -6,6 +6,7 @@ targets_main <- function() {
     chromosomes = biomart_fetch_chromosomes(mart),
     #structures = biomart_fetch_structures(mart, gene_ids),
     gns = biomart_fetch_genes(mart),
+    trans = biomart_fetch_transcripts(mart),
     terms = get_functional_terms(config_annot, gns),
     fterms = prepare_terms_fenr(terms),
     rmsk = get_repeat_masker()
@@ -63,10 +64,26 @@ targets_main <- function() {
       fig_peak_width = plot_peak_width_distribution(peaks),
 
       # Annotate all peaks
-      peaks_annotatr = annotate_peaks_annotatr(peaks, annotations),
+      peaks_annotatr_raw = annotate_peaks_annotatr(peaks, annotations),
+      peaks_annotatr = reduce_annotatr(peaks_annotatr_raw, trans),
       peaks_chipseeker = annotate_peaks_chipseeker(peaks),
+      peaks_rmsk = annotate_peaks_rmsk(peaks, rmsk),
+
+      # Random peaks
+      prand = make_random_regions(peaks, chrom_sizes, n_regions = 100000),
+      prand_annotatr = annotate_peaks_annotatr(prand, annotations) |> reduce_annotatr(trans),
+      prand_chipseeker = annotate_peaks_chipseeker(prand),
+      prand_rmsk = annotate_peaks_rmsk(prand, rmsk),
+
       fig_annotatr = plot_peak_annotatios(peaks_annotatr),
       fig_chipseeker = plot_peak_annotatios(peaks_chipseeker),
+
+      # These are proper figures
+      fig_groups_annotatr = plot_group_peak_annotations(peaks_annotatr, rand_an = prand_annotatr, palette = 2),
+      fig_groups_chipseeker = plot_group_peak_annotations(peaks_chipseeker, rand_an = prand_chipseeker),
+      fig_groups_rmsk = plot_group_peak_annotations(peaks_rmsk, annot_var = "rep_category", rand_an = prand_rmsk, palette = 3),
+
+      png_groups_tss = plot_group_peak_tss(peaks_chipseeker, rand_an = prand_chipseeker, max_dist = 300) |> gs("groups_tss", 6, 4),
 
       # Prepare for DiffBind
       meta_db = make_diffbind_metadata(metadata3, config, type = TYPE),
@@ -110,14 +127,20 @@ targets_main <- function() {
         fig_up_down = plot_up_down(dec),
 
         # Annotate DE results
-        dec_annotatr = annotate_peaks_annotatr(dec, annotations),
+        dec_annotatr = annotate_peaks_annotatr(dec, annotations) |> reduce_annotatr(trans),
         dec_chipseeker = annotate_peaks_chipseeker(dec),
         dec_rmsk = annotate_peaks_rmsk(dec, rmsk),
 
-        fig_dec_annotatr = plot_peak_annotatios(dec_annotatr |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
-        fig_dec_chipseeker = plot_peak_annotatios(dec_chipseeker |> dplyr::filter(fdr < 0.01), group_var = "contrast"),
-        fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk |> dplyr::filter(contrast %in% c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl", "iPS_SETDB1-iPS_Ctrl", "48h-iPS", "SETDB1-Ctrl")), fdr_limit = 0.01),
+        dec_annotatr_sig = dec_annotatr |> dplyr::filter(fdr < 0.01 & abs(log_fc) > 1),
+        dec_chipseeker_sig = dec_chipseeker |> dplyr::filter(fdr < 0.01 & abs(log_fc) > 1),
+        dec_rmsk_sig = dec_rmsk |> dplyr::filter(fdr < 0.01 & abs(log_fc) > 1),
+
+        fig_dec_annotatr = plot_group_peak_annotations(dec_annotatr_sig, group_var = "contrast", palette = 2, n_top = NULL),
+        fig_dec_chipseeker = plot_group_peak_annotations(dec_chipseeker_sig, group_var = "contrast", n_top = NULL),
+        fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk_sig, fdr_limit = 0.01),
         fig_dec_rmsk_all = plot_peak_rmsk(dec_rmsk),
+
+        fig_dec_rmsk = plot_group_peak_annotations(dec_rmsk_sig, group_var = "contrast", annot_var = "rep_category", n_top = NULL, palette = 3),
 
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
 
@@ -147,11 +170,11 @@ targets_main <- function() {
     db_none_broad = no_normalization(db_libs_broad),
     fig_norm_compare = plot_all_total_bindings(db_none_broad, db_libs_broad, db_spike_broad, metadata3),
 
-    fig_peak_example_1 = plot_region_ggbio("Me3_iPS_Ctrl_2", config, metadata3, make_region(17, 26615466, 26624227), peaks_broad, peaks_narrow),
-    fig_peak_example_2 = plot_region_ggbio("Me3_iPS_SET_2", config, metadata3, make_region(12, 34250000, 34415000), peaks_broad, peaks_narrow),
+    #fig_peak_example_1 = plot_region_ggbio("Me3_iPS_Ctrl_2", config, metadata3, make_region(17, 26615466, 26624227), peaks_broad, peaks_narrow),
+    #fig_peak_example_2 = plot_region_ggbio("Me3_iPS_SET_2", config, metadata3, make_region(12, 34250000, 34415000), peaks_broad, peaks_narrow),
 
     fig_de_abu_example_1 = plot_peak_bindings(dbc_full_libs_broad, "5:70822898-70823402", metadata3),
-    fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_full_libs_broad |> dplyr::filter(contrast == "48h-iPS"), "5:70822898-70823402", config, metadata3, peaks_broad, peaks_narrow, normfac |> dplyr::mutate(norm = libs_norm)),
+    #fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_full_libs_broad |> dplyr::filter(contrast == "48h-iPS"), "5:70822898-70823402", config, metadata3, peaks_broad, peaks_narrow, normfac |> dplyr::mutate(norm = libs_norm)),
 
     normfac = tibble::tibble(
       sample = db_libs_broad$samples$SampleID,
@@ -165,6 +188,28 @@ targets_main <- function() {
     png_peaks_broad_set = plot_peak_distribution_sample(peaks_broad, "Me3_iPS_SET_1", chrom_sizes, bar_size = 1) |> gs("peaks_broad_dist_set", width = 8, height = 8),
     png_peaks_broad_48 = plot_peak_distribution_sample(peaks_broad, "Me3_48h_SET_1", chrom_sizes, bar_size = 1) |> gs("peaks_broad_dist_48", width = 8, height = 8),
     png_peaks_broad_11 = plot_peak_distribution_chrom(peaks_broad, "11", metadata) |> gs("peaks_broad_11", width = 8, height = 8)
+  )
+
+  for_manuscript <- tar_plan(
+    mn_fdr_limit = 0.01,
+    mn_logfc_limit = 0.76,
+    mn_ctr = c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl", "iPS_SETDB1-iPS_Ctrl"),
+
+    png_volcano = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast %in% mn_ctr), fdr_limit = mn_fdr_limit, log_fc_limit = mn_logfc_limit) |> gp("volcano", width = 7, height = 3),
+
+    tar_map(
+      values = tibble::tibble(DIRECTION = c("up", "down")),
+      names = DIRECTION,
+
+      tar_plan(
+        mn_dec = filter_dec(dec_chipseeker_groups_libs_broad, ctrs = mn_ctr, fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit, direction = DIRECTION),
+        mn_dec_rmsk = filter_dec(dec_rmsk_groups_libs_broad, ctrs = mn_ctr, fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit, direction = DIRECTION),
+
+        png_chipseeker_annotations = mn_plot_peak_annotatios(mn_dec) |> gp(paste0("chipseeker_annotations_", DIRECTION), width = 7, height = 3.5),
+        png_rmsk_da = plot_peak_rmsk(mn_dec_rmsk , fdr_limit = mn_logfc_limit)|> gp(paste0("rmsk_da_", DIRECTION), width = 7, height = 4.5),
+      )
+    )
+    
   )
 
   for_shiny <- tar_plan(
@@ -191,6 +236,7 @@ targets_main <- function() {
     map_peaks,
     map_diffbind,
     for_report,
+    for_manuscript,
     for_shiny
   )
   

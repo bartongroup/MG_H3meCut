@@ -115,12 +115,12 @@ de_full_model <- function(dbc) {
 }
 
 de_groups <- function(dbc) {
-  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_Ctrl", "iPS_SETDB1"))
   dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_Ctrl", "48h_Ctrl"))
-  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_Ctrl", "48h_SETDB1"))
-  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_SETDB1", "48h_Ctrl"))
-  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_SETDB1", "48h_SETDB1"))
   dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "48h_Ctrl", "48h_SETDB1"))
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_Ctrl", "iPS_SETDB1"))
+  dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_SETDB1", "48h_SETDB1")) 
+  # dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_Ctrl", "48h_SETDB1"))
+  # dbc <- DiffBind::dba.contrast(dbc, contrast = c("Condition", "iPS_SETDB1", "48h_Ctrl"))
   DiffBind::dba.analyze(dbc, bBlacklist = FALSE, bGreylist = FALSE)
 }
 

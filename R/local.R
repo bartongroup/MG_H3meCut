@@ -39,12 +39,12 @@ read_metadata <- function(sample_file) {
     ) |> 
     mutate(
       replicate = str_remove(replicate, "rep"),
-      treatment = case_match(
+      treatment = recode_values(
         treatment,
         "Nt" ~ "Ctrl",
         "set" ~ "SETDB1"
       ),
-      time_point = case_match(
+      time_point = recode_values(
         time_point,
         "48" ~ "48h",
         "iPS" ~ "iPS"
@@ -154,3 +154,45 @@ rmsk_stats <- function(rmsk, pks, n_perm = 100, n_top = 20) {
 
 
 
+filter_dec <- function(dec, ctrs, fdr_limit = 0.01, logfc_limit = 0.76, direction = c("up", "down")) {
+  direction <- match.arg(direction)
+  dec |> 
+    mutate(dir = case_when(
+      log_fc > 0 ~ "up",
+      log_fc <= 0 ~ "down"
+    )) |>
+    filter(contrast %in% ctrs & fdr < fdr_limit & abs(log_fc) > logfc_limit & dir == direction)
+}
+
+
+
+make_random_regions <- function(peaks, chrom_sizes, n_regions = 100000,
+                                chromosomes = c(as.character(1:22), "X", "Y")) {
+  cs <- chrom_sizes |>
+    dplyr::filter(chr %in% chromosomes) |>
+    dplyr::select(chr, chrom_size)
+
+  widths <- peaks |>
+    dplyr::filter(chr %in% chromosomes) |>
+    dplyr::slice_sample(n = n_regions) |> 
+    dplyr::mutate(width = end - start) |>
+    dplyr::pull(width)
+    
+  # For each sampled width, choose a chromosome with probability proportional
+  # to the number of valid start positions available on that chromosome.
+  chr_id <- purrr::map_int(widths, \(w) {
+    weights <- pmax(cs$chrom_size - w + 1, 0)
+    sample.int(nrow(cs), size = 1, prob = weights)
+  })
+
+  max_start <- cs$chrom_size[chr_id] - widths
+
+  tibble::tibble(
+    peak_id = sprintf("peak_%d", 1:length(widths)),
+    chr = cs$chr[chr_id],
+    width = widths,
+    start = purrr::map_int(max_start, \(m) sample.int(m + 1, size = 1) - 1L),
+    end = start + width
+  ) |>
+    dplyr::select(peak_id, chr, start, end, width)
+}

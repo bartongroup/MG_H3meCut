@@ -31,12 +31,19 @@ read_peak_files <- function(config, meta, format = c("narrow", "broad")) {
   ext <- ifelse(format == "narrow", "narrowPeak", "broadPeak")
   path <- file.path(config$data_path, config$dir[[str_glue("macs_{format}")]])
 
-  map2(meta$raw_sample, meta$sample, function(rsmpl, smpl) {
+  pk <- map2(meta$raw_sample, meta$sample, function(rsmpl, smpl) {
     f <- file.path(path, str_glue("{rsmpl}_peaks.{ext}"))
     read_one_peak_file(f, format) |> 
       add_column(sample = smpl)
   }) |> 
     bind_rows()
+
+  mt <- meta |> 
+    select(sample, group)
+
+  # Add group (condition)
+  pk |> 
+    left_join(mt, by = join_by(sample))
 }
 
 

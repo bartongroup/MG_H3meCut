@@ -1,5 +1,7 @@
 okabe_ito_palette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#AAAAAA", "#000000")
 
+annot_palette <- c("#F0E442", "#33A02C", "#A6CEE3", "#1F78B4", "#B2DF8A", "#f0dfd4", "#D55E00")
+
 th <- function() {
   ggplot2::theme_bw() +
   ggplot2::theme(panel.grid = ggplot2::element_blank())
@@ -91,7 +93,7 @@ plot_ma <- function(res, expr_var = log_cpm, fc_var = log_fc, p_var = p_value, f
 }
 
 plot_volcano <- function(res, fc_var = log_fc, p_var = p_value, fdr_var = fdr, group_var = contrast,
-                         sel_genes = NULL, fdr_limit = 0.01, log_fc_limit = 0, point_size = 0.5,
+                         sel_genes = NULL, fdr_limit = 0.01, log_fc_limit = 1, point_size = 0.5,
                          point_alpha = 0.5, scales = "fixed") {
   if(is.null(sel_genes)) {
     res <- res |> mutate(sel = {{ fdr_var }} < fdr_limit & abs({{ fc_var }}) >= log_fc_limit)
@@ -212,18 +214,140 @@ plot_number_of_peaks <- function(peaks, meta) {
   })
 }
 
+plot_group_peak_tss <- function(an, group_var = "group", n_top = 30000, rand_an = NULL, max_dist = 300) {
+  d <- an |> 
+    mutate(
+      grp = get(group_var)
+    ) |> 
+    distinct(grp, peak_id, distance_to_tss, signal)
 
-plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample", annot_var = "annotation") {
+  if(!is.null(n_top)) {
+    d <- d |> 
+      group_by(grp) |> 
+      slice_max(signal, n = n_top) |>
+      ungroup() |> 
+      select(-signal)
+  }
+
+  if(!is.null(rand_an)) {
+    ra <- rand_an |> 
+      select(peak_id, distance_to_tss) |> 
+      mutate(grp = "Random")
+    d <- d |> 
+      bind_rows(ra)
+  }
+
+  d <- d |> 
+    mutate(tsskb = distance_to_tss / 1000) |> 
+    filter(abs(tsskb) <= max_dist)
+  
+  d |> 
+    ggplot(aes(x = grp, y = distance_to_tss / 1000, colour = grp)) +
+    th() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    ) +
+    theme(legend.position = "none") +
+    geom_quasirandom(size = 0.3) +
+    geom_hline(yintercept = 0, linewidth = 0.1, alpha = 0.5) +
+    scale_colour_manual(values = okabe_ito_palette) +
+    labs(x = NULL, y = "Distance to TSS (kb)")
+}
+
+plot_group_peak_annotations <- function(an, group_var = "group", annot_var = "annotation",
+                                        n_top = 30000, rand_an = NULL, palette = 1, order_annot = FALSE) {
+  
+  d <- an |> 
+    mutate(grp = get(group_var), ann = get(annot_var))
+
+  # Some data don't have signal
+  if(!("signal" %in% names(d))) {
+    d <- d |> mutate(signal = 0)
+  }
+
+  d <- d |> 
+    distinct(grp, peak_id, ann, signal)
+
+  if(!is.null(n_top)) {
+    d <- d |> 
+      group_by(grp) |> 
+      slice_max(signal, n = n_top) |>
+      ungroup() |> 
+      select(-signal)
+  }
+
+  if(!is.null(rand_an)) {
+    ra <- rand_an |> 
+      mutate(ann = get(annot_var)) |> 
+      select(peak_id, ann) |> 
+      mutate(grp = "Random")
+    d <- d |> 
+      bind_rows(ra)
+  }
+
+  dc <- d |> 
+    count(grp, ann) |> 
+    group_by(grp) |> 
+    mutate(prop = n / sum(n)) |> 
+    ungroup()
+
+  if(order_annot)
+    dc <- dc |> mutate(ann = fct_reorder(ann, -n))
+  
+  if(annot_var == "rep_category") {
+    dc <- dc |>
+      mutate(ann = factor(ann, levels = c("SINE", "LINE", "LTR", "Simple_repeat", "DNA", "Low_complexity", "Satellite", "Retroposon", 
+"Other")))
+  }
+    
+  if(palette == 1) {
+    pal <- annot_palette
+  } else if(palette == 2) {
+    pal <- c("#FDBF6F", annot_palette)
+  } else if(palette == 3) {
+    pal <- RColorBrewer::brewer.pal(12, "Paired")
+  }
+
+  env <- new.env(parent = globalenv())
+  env$dc <- dc
+  env$pal <- pal
+
+  with(env, {
+    dc |> 
+      ggplot(aes(x = grp, y = prop, fill = ann)) +
+      th() +
+      theme(
+         axis.text.x = element_text(angle = 45, hjust = 1)
+      ) +
+      geom_col(position = "stack") +
+      #scale_fill_manual(values = okabe_ito_palette) +
+      scale_fill_manual(values = pal) +
+      scale_y_continuous(expand = c(0, 0)) +
+      labs(x = NULL, y = "Proportion", fill = "Annotation")
+  })
+
+}
+
+plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample", annot_var = "annotation", scale_y = TRUE) {
   env <- new.env(parent = globalenv())
   env$ncol <- ncol
   env$group_var <- group_var
   env$annot_var = annot_var
+  env$scale_y = scale_y
+
+  if(scale_y) {
+    sc <- 1000
+    env$y_lab <- "Count (thousands)"
+  } else {
+    sc <- 1
+    env$y_lab <- "Count"
+  }
 
   env$d <- an |> 
     mutate(grp = get(group_var), ann = get(annot_var)) |> 
     distinct(grp, peak_id, ann) |> 
     count(grp, ann) |> 
-    mutate(n = n / 1000)
+    mutate(n = n / sc)
   with(env, {
     d |> 
       ggplot(aes(x = ann, y = n, fill = ann)) +
@@ -236,7 +360,7 @@ plot_peak_annotatios <- function(an, ncol = 4, group_var = "sample", annot_var =
       facet_wrap(~grp, ncol = ncol, scales = "free_y") +
       scale_fill_brewer(palette = "Paired") +
       scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scientific_10) +
-      labs(x = NULL, y = "Count (thousands)")
+      labs(x = NULL, y = y_lab)
   })
 }
 

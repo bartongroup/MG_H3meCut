@@ -74,6 +74,26 @@ biomart_fetch_genes <- function(mart, use_cache = TRUE, with_ncbi = FALSE) {
     dplyr::mutate(gene_symbol = if_else(is.na(gene_symbol), id, gene_symbol))
 }
 
+biomart_fetch_transcripts <- function(mart, use_cache = TRUE) {
+  attr <- c(
+    gene_id = "ensembl_gene_id",
+    transcript_id = "ensembl_transcript_id",
+    transcript_is_canonical = "transcript_is_canonical",
+    gene_symbol = "external_gene_name"
+  )
+
+  biomaRt::getBM(attributes = attr, mart = mart, useCache = use_cache) |>
+    dplyr::rename(!!attr) |>
+    tibble::as_tibble() |>
+    dplyr::mutate(
+      dplyr::across(
+        c(gene_symbol),
+        ~ dplyr::na_if(.x, "")
+      )
+    )
+}
+
+
 #' Fetch Gene Structures from Ensembl biomaRt
 #'
 #' This function retrieves gene structures, including exons and UTRs, from an

@@ -21,20 +21,17 @@ annotate_peaks_chipseeker <- function(bed) {
     ) |> 
     mutate(
       chr = str_remove(chr, "chr"),
-      annotation = annot_id |> str_remove("(?<=^(Intron|Exon))\\s*\\([^)]*\\)"),
+      #annotation = annot_id |> str_remove("(?<=^(Intron|Exon))\\s*\\([^)]*\\)"),
+      annotation = annot_id |> str_remove("\\s\\(.+\\)"),
       annotation = fct_relevel(
         annotation, 
         c(
-          "Promoter (2-3kb)",
-          "Promoter (1-2kb)",
-          "Promoter (<=1kb)",
+          "Promoter",
           "5' UTR",
           "Exon",
           "Intron",
           "3' UTR",
-          "Downstream (<1kb)",
-          "Downstream (1-2kb)",
-          "Downstream (2-3kb)",
+          "Downstream",
           "Distal Intergenic"
         )
       )
@@ -73,7 +70,16 @@ annotate_peaks_annotatr <- function(bed, annotations) {
     ) |> 
     mutate(
       annotation = annotation |> str_remove("hg38_genes_") |> str_remove("s$"),
-      annotation = fct_relevel(annotation, "1to5kb", "promoter", "5UTR", "exon", "intron", "3UTR"),
+      annotation = recode_values(
+        annotation,
+        "1to5kb" ~ "1-5 kb",
+        "promoter" ~ "Promoter",
+        "5UTR" ~ "5' UTR",
+        "exon" ~ "Exon",
+        "intron" ~ "Intron",
+        "3UTR" ~ "3' UTR"
+      ),
+      annotation = fct_relevel(annotation, "1-5 kb", "Promoter", "5' UTR", "Exon", "Intron", "3' UTR"),
     ) |> 
     relocate(peak_id, .before = 1)
 
@@ -94,6 +100,21 @@ annotate_peaks_annotatr <- function(bed, annotations) {
  
   an |> 
     left_join(gene_info, by = c("entrez_id"))
+}
+
+# Annotatr results are very redundant, with the same
+# feature (e.g. exon) appearing multiple times, from
+# multiple transcripts. This function collapses redundancy.
+# Primarly for counting annotations.
+# Only canonical transcript are used.
+reduce_annotatr <- function(an, trans) {
+  tr <- trans |> 
+    filter(transcript_is_canonical == 1) |> 
+    select(transcript_id)
+
+  an |> 
+    mutate(transcript_id = str_remove(transcript_id, "\\..*$")) |> 
+    semi_join(tr, by = "transcript_id")
 }
 
 
@@ -118,7 +139,8 @@ annotate_peaks_rmsk <- function(bed, rmsk) {
       rep_name = annot_rep_name,
       rep_class = annot_rep_class,
       rep_family = annot_rep_family,
-      rep_fam = annot_rep_fam
+      rep_fam = annot_rep_fam,
+      rep_category = annot_rep_category
     ) |> 
     relocate(peak_id, .before = 1) |> 
     relocate(rep_id, .before = rep_chr)
@@ -207,5 +229,13 @@ get_repeat_masker <- function() {
       chr = str_remove(chr, "chr"),
       across(c(start, end), as.integer)
     ) |> 
-    unite(rep_fam, c(rep_class, rep_family), sep = ":", remove = FALSE)
+    unite(rep_fam, c(rep_class, rep_family), sep = ":", remove = FALSE) |> 
+    mutate(
+      rep_category = str_remove(rep_class, "\\?"),
+      rep_category = if_else(
+        rep_category %in% c("Unknown", "snRNA", "RC", "tRNA", "rRNA", "srpRNA", "scRNA", "RNA"),
+        "Other",
+        rep_category
+      )
+    )
 }
