@@ -153,6 +153,15 @@ targets_main <- function() {
 
   )
 
+  search_for_motifs <- tar_plan(
+    tar_target(genome_file, file.path(config$data_path, config$dir$genome, "Homo_sapiens.canonical.fa"), format = "file"),
+    db_ranges = dec_chipseeker_sig_groups_libs_broad |> distinct(peak_id, chr, start, end, strand),
+    db_seqs = fetch_range_sequences(genome_file, db_ranges),
+    tf_motifs = get_jaspar_matrix(),
+    tf_res = search_sequences_for_motifs(db_seqs, tf_motifs),
+    db_res = dec_chipseeker_sig_groups_libs_broad |> dplyr::left_join(tf_res |> dplyr::mutate(peak_id = as.character(peak_id)), by = "peak_id")
+  )
+
 
 
  
@@ -235,6 +244,7 @@ targets_main <- function() {
     read_data,
     map_peaks,
     map_diffbind,
+    search_for_motifs,
     for_report,
     for_manuscript,
     for_shiny

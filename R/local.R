@@ -196,3 +196,26 @@ make_random_regions <- function(peaks, chrom_sizes, n_regions = 100000,
   ) |>
     dplyr::select(peak_id, chr, start, end, width)
 }
+
+plot_peak_coverage <- function(peaks, chrom_sizes, annot = NULL) {
+  if(!is.null(annot)) {
+    peaks <- peaks |> 
+      filter(annotation == annot)
+  }
+
+  tot <- sum(chrom_sizes$chrom_size)
+  
+  peaks |> 
+    distinct(sample, chr, start, end) |> 
+    filter(chr %in% chrom_sizes$chr) |> 
+    mutate(width = end - start + 1) |> 
+    group_by(sample) |> 
+    summarise(peak_coverage = sum(width), .groups = "drop") |> 
+    mutate(peak_perc = 100 * peak_coverage / tot)  |> 
+    ggplot(aes(x = sample, y = peak_perc)) +
+    th() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    geom_col() +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.3))) +
+    labs(x = "Sample", y = "Peak Coverage (%)")
+}

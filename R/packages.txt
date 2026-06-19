@@ -10,3 +10,5 @@ cowplot
 broom
 rtracklayer
 ggbio
+progress
+
