@@ -4,7 +4,7 @@ annotate_peaks_chipseeker <- function(bed) {
 
   pk <- ChIPseeker::annotatePeak(
     gr,
-    tssRegion = c(0, 3000),
+    tssRegion = c(-1000, 0),
     TxDb = TxDb.Hsapiens.UCSC.hg38.knownGene::TxDb.Hsapiens.UCSC.hg38.knownGene,
     annoDb = "org.Hs.eg.db",
     level = "gene"

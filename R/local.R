@@ -197,7 +197,7 @@ make_random_regions <- function(peaks, chrom_sizes, n_regions = 100000,
     dplyr::select(peak_id, chr, start, end, width)
 }
 
-plot_peak_coverage <- function(peaks, chrom_sizes, annot = NULL) {
+plot_peak_coverage <- function(peaks, chrom_sizes, meta, annot = NULL) {
   if(!is.null(annot)) {
     peaks <- peaks |> 
       filter(annotation == annot)
@@ -205,17 +205,50 @@ plot_peak_coverage <- function(peaks, chrom_sizes, annot = NULL) {
 
   tot <- sum(chrom_sizes$chrom_size)
   
-  peaks |> 
+  d <- peaks |> 
     distinct(sample, chr, start, end) |> 
     filter(chr %in% chrom_sizes$chr) |> 
     mutate(width = end - start + 1) |> 
     group_by(sample) |> 
     summarise(peak_coverage = sum(width), .groups = "drop") |> 
-    mutate(peak_perc = 100 * peak_coverage / tot)  |> 
-    ggplot(aes(x = sample, y = peak_perc)) +
-    th() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    geom_col() +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.3))) +
-    labs(x = "Sample", y = "Peak Coverage (%)")
+    mutate(peak_perc = 100 * peak_coverage / tot) |> 
+    left_join(meta, by = "sample")
+
+  env <- new.env(parent = globalenv())
+  env$d <- d
+
+  with(env, {
+    d |> 
+      ggplot(aes(x = sample, y = peak_perc, fill = group)) +
+      th() +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none"
+      ) +
+      geom_col() +
+      scale_fill_manual(values = okabe_ito_palette) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.3))) +
+      labs(x = "Sample", y = "Genome coverage by peaks (%)")
+  })
+}
+
+get_motif_stats <- function(dec_res, dec_for_motifs) {
+  d1 <- dec_for_motifs |> 
+    distinct(contrast, peak_id) |> 
+    count(contrast, name = "DB peaks")
+  d2 <- dec_res |> 
+    distinct(contrast, peak_id) |> 
+    count(contrast, name = "Peaks with hits")
+  d3 <- dec_res |> 
+    distinct(contrast, motif_name, peak_id) |> 
+    count(contrast, peak_id) |> 
+    group_by(contrast) |> 
+    summarise(`Motifs per peak` = mean(n), .groups = "drop")
+  d4 <- dec_res |> 
+    distinct(contrast, motif_name) |> 
+    count(contrast, name = "Unique motifs")
+
+  inner_join(d1, d2, by = "contrast") |>
+    inner_join(d3, by = "contrast") |>
+    inner_join(d4, by = "contrast")
 }

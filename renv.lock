@@ -1079,6 +1079,49 @@
       "Author": "Rory Stark [aut, cre], Gord Brown [aut]",
       "Maintainer": "Rory Stark <bioconductor@starkhome.com>"
     },
+    "DirichletMultinomial": {
+      "Package": "DirichletMultinomial",
+      "Version": "1.54.0",
+      "Source": "Bioconductor",
+      "Type": "Package",
+      "Title": "Dirichlet-Multinomial Mixture Model Machine Learning for Microbiome Data",
+      "Authors@R": "person( \"Martin\", \"Morgan\", role = c(\"aut\", \"cre\"), email = \"mtmorgan.xyz@gmail.com\", comment = c(ORCID = \"0000-0002-5874-8148\"))",
+      "Description": "Dirichlet-multinomial mixture models can be used to describe variability in microbial metagenomic data. This package is an interface to code originally made available by Holmes, Harris, and Quince, 2012, PLoS ONE 7(2): 1-15, as discussed further in the man page for this package, ?DirichletMultinomial.",
+      "License": "LGPL-3",
+      "Depends": [
+        "S4Vectors",
+        "IRanges"
+      ],
+      "Imports": [
+        "stats4",
+        "methods",
+        "BiocGenerics"
+      ],
+      "Suggests": [
+        "lattice",
+        "parallel",
+        "MASS",
+        "RColorBrewer",
+        "DT",
+        "knitr",
+        "rmarkdown",
+        "BiocStyle"
+      ],
+      "Collate": "AllGenerics.R dmn.R dmngroup.R roc.R util.R",
+      "SystemRequirements": "gsl",
+      "biocViews": "ImmunoOncology, Microbiome, Sequencing, Clustering, Classification, Metagenomics",
+      "VignetteBuilder": "knitr",
+      "URL": "https://mtmorgan.github.io/DirichletMultinomial/",
+      "BugReports": "https://github.com/mtmorgan/DirichletMultinomial/issues",
+      "git_url": "https://git.bioconductor.org/packages/DirichletMultinomial",
+      "git_branch": "RELEASE_3_23",
+      "git_last_commit": "b97b6c6",
+      "git_last_commit_date": "2026-04-28",
+      "Repository": "Bioconductor 3.23",
+      "NeedsCompilation": "yes",
+      "Author": "Martin Morgan [aut, cre] (ORCID: <https://orcid.org/0000-0002-5874-8148>)",
+      "Maintainer": "Martin Morgan <mtmorgan.xyz@gmail.com>"
+    },
     "Formula": {
       "Package": "Formula",
       "Version": "1.2-5",
@@ -1678,6 +1721,41 @@
       "Author": "Hervé Pagès [aut, cre], Patrick Aboyoun [aut], Michael Lawrence [aut]",
       "Maintainer": "Hervé Pagès <hpages.on.github@gmail.com>"
     },
+    "JASPAR2024": {
+      "Package": "JASPAR2024",
+      "Version": "0.99.7",
+      "Source": "Bioconductor",
+      "Type": "Package",
+      "Title": "Data package for JASPAR database (version 2024)",
+      "Authors@R": "person(given = \"Damir\", family = \"Baranasic\",  role = c(\"aut\", \"cre\"), email = \"damir.baranasic@lms.mrc.ac.uk\",  comment = c(ORCID = \"0000-0001-5948-0932\"))",
+      "Description": "JASPAR (https://jaspar.elixir.no/) is a widely-used open-access  database presenting manually curated high-quality and  non-redundant DNA-binding profiles for transcription factors (TFs)  across taxa. In this 10th release and 20th-anniversary update,  the CORE collection has expanded with 329 new profiles. We updated three existing profiles and provided orthogonal support for  72 profiles from the previous release UNVALIDATED collection.  Altogether, the JASPAR 2024 update provides a 20 percent increase  in CORE profiles from the previous release. A trimming algorithm  enhanced profiles by removing low information content flanking  base pairs, which were likely uninformative (within the capacity  of the PFM models) for TFBS predictions and modelling TF-DNA  interactions. This release includes enhanced metadata, featuring a refined classification for plant TFs structural DNA-binding  domains. The new JASPAR collections prompt updates to the genomic  tracks of predicted TF-binding sites in 8 organisms, with human and mouse tracks available as native tracks in the UCSC Genome  browser. All data are available through the JASPAR web interface  and programmatically through its API and the updated Bioconductor and pyJASPAR packages. Finally, a new TFBS extraction tool  enables users to retrieve predicted JASPAR TFBSs intersecting  their genomic regions of interest.",
+      "Depends": [
+        "R (>= 4.3.0)",
+        "methods",
+        "BiocFileCache",
+        "utils"
+      ],
+      "License": "GPL-2",
+      "URL": "https://jaspar.elixir.no/",
+      "NeedsCompilation": "no",
+      "biocViews": "AnnotationData, FunctionalAnnotation, AnnotationHub",
+      "RoxygenNote": "7.2.3",
+      "Suggests": [
+        "knitr",
+        "rmarkdown",
+        "BiocStyle",
+        "RSQLite"
+      ],
+      "VignetteBuilder": "knitr",
+      "BugReports": "https://github.com/da-bar/JASPAR2024",
+      "git_url": "https://git.bioconductor.org/packages/JASPAR2024",
+      "git_branch": "devel",
+      "git_last_commit": "3a1e18a",
+      "git_last_commit_date": "2024-10-31",
+      "Repository": "Bioconductor 3.21",
+      "Author": "Damir Baranasic [aut, cre] (ORCID: <https://orcid.org/0000-0001-5948-0932>)",
+      "Maintainer": "Damir Baranasic <damir.baranasic@lms.mrc.ac.uk>"
+    },
     "KEGGREST": {
       "Package": "KEGGREST",
       "Version": "1.52.0",
@@ -2185,6 +2263,32 @@
       "Author": "JJ Allaire [aut], Romain Francois [aut, cph], Kevin Ushey [aut, cre], Gregory Vandenbrouck [aut], Marcus Geelnard [aut, cph] (TinyThread library, https://tinythreadpp.bitsnbites.eu/), Hamada S. Badr [ctb] (ORCID: <https://orcid.org/0000-0002-9808-2344>), Posit, PBC [cph], Intel [aut, cph] (Intel TBB library, https://www.threadingbuildingblocks.org/), Microsoft [cph]",
       "Repository": "CRAN"
     },
+    "RcppThread": {
+      "Package": "RcppThread",
+      "Version": "2.4.0",
+      "Source": "Repository",
+      "Title": "R-Friendly Threading in C++",
+      "Authors@R": "c( person(\"Thomas\", \"Nagler\",, \"mail@tnagler.com\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0003-1855-0046\")) )",
+      "Description": "Provides a C++11-style thread class and thread pool that can safely be interrupted from R. See Nagler (2021) <doi:10.18637/jss.v097.c01>.",
+      "Depends": [
+        "R (>= 3.3.0)"
+      ],
+      "License": "MIT + file LICENSE",
+      "Encoding": "UTF-8",
+      "URL": "https://github.com/tnagler/RcppThread",
+      "BugReports": "https://github.com/tnagler/RcppThread/issues",
+      "Suggests": [
+        "testthat",
+        "R.rsp",
+        "Rcpp"
+      ],
+      "VignetteBuilder": "R.rsp",
+      "Config/roxygen2/version": "8.0.0",
+      "NeedsCompilation": "yes",
+      "Author": "Thomas Nagler [aut, cre] (ORCID: <https://orcid.org/0000-0003-1855-0046>)",
+      "Maintainer": "Thomas Nagler <mail@tnagler.com>",
+      "Repository": "CRAN"
+    },
     "Rhtslib": {
       "Package": "Rhtslib",
       "Version": "3.8.0",
@@ -2648,6 +2752,99 @@
       "NeedsCompilation": "no",
       "Author": "Martin Morgan [aut], Valerie Obenchain [aut], Jim Hester [aut], Hervé Pagès [aut, cre]",
       "Maintainer": "Hervé Pagès <hpages.on.github@gmail.com>"
+    },
+    "TFBSTools": {
+      "Package": "TFBSTools",
+      "Version": "1.50.0",
+      "Source": "Bioconductor",
+      "Date": "2025-07-22",
+      "Title": "Software Package for Transcription Factor Binding Site (TFBS) Analysis",
+      "Description": "TFBSTools is a package for the analysis and manipulation of  transcription factor binding sites. It includes matrices conversion between Position Frequency Matirx (PFM),  Position Weight Matirx (PWM) and Information Content Matrix (ICM). It can also scan putative TFBS from sequence/alignment,  query JASPAR database and provides a wrapper of  de novo motif discovery software.",
+      "Authors@R": "person(\"Ge\", \"Tan\", email=\"ge_tan@live.com\", role = c(\"aut\", \"cre\"))",
+      "VignetteBuilder": "knitr",
+      "Imports": [
+        "Biobase(>= 2.28)",
+        "Biostrings(>= 2.36.4)",
+        "pwalign",
+        "BiocGenerics(>= 0.14.0)",
+        "BiocParallel(>= 1.2.21)",
+        "BSgenome(>= 1.36.3)",
+        "caTools(>= 1.17.1)",
+        "DirichletMultinomial(>= 1.10.0)",
+        "Seqinfo",
+        "GenomicRanges(>= 1.20.6)",
+        "gtools(>= 3.5.0)",
+        "grid",
+        "IRanges(>= 2.2.7)",
+        "methods",
+        "DBI (>= 0.6)",
+        "RSQLite(>= 1.0.0)",
+        "rtracklayer(>= 1.28.10)",
+        "seqLogo(>= 1.34.0)",
+        "S4Vectors(>= 0.9.25)",
+        "TFMPvalue(>= 0.0.5)",
+        "XML(>= 3.98-1.3)",
+        "XVector(>= 0.8.0)",
+        "parallel"
+      ],
+      "Depends": [
+        "R (>= 3.2.2)"
+      ],
+      "Suggests": [
+        "BiocStyle(>= 1.7.7)",
+        "JASPAR2014(>= 1.4.0)",
+        "knitr(>= 1.11)",
+        "testthat",
+        "JASPAR2016(>= 1.0.0)",
+        "JASPAR2018(>= 1.0.0)",
+        "rmarkdown"
+      ],
+      "License": "GPL-2",
+      "URL": "https://github.com/ge11232002/TFBSTools",
+      "BugReports": "https://github.com/ge11232002/TFBSTools/issues",
+      "Type": "Package",
+      "biocViews": "MotifAnnotation, GeneRegulation, MotifDiscovery, Transcription, Alignment",
+      "NeedsCompilation": "yes",
+      "LazyData": "yes",
+      "Collate": "AllGenerics.r AllClasses.r show-methods.r util-methods.r XMatrix-methods.r XMatrixList-methods.r SiteSet-methods.r coercion-methods.r DB-methods.r JASPAR.R PairwiseAlignment-methods.r ICM-methods.r PWM-methods.r Motif-methods.r PFM-methods.r Wrappers-methods.r DirichletMixture.r TFFM.R TFFMseqLogo.R IO.R Enrichment.R",
+      "git_url": "https://git.bioconductor.org/packages/TFBSTools",
+      "git_branch": "RELEASE_3_23",
+      "git_last_commit": "45fd538",
+      "git_last_commit_date": "2026-04-28",
+      "Repository": "Bioconductor 3.23",
+      "Author": "Ge Tan [aut, cre]",
+      "Maintainer": "Ge Tan <ge_tan@live.com>"
+    },
+    "TFMPvalue": {
+      "Package": "TFMPvalue",
+      "Version": "1.0.0",
+      "Source": "Repository",
+      "Date": "2026-01-18",
+      "Title": "Efficient and Accurate P-Value Computation for Position Weight Matrices",
+      "Description": "In putative Transcription Factor Binding Sites (TFBSs)  identification from sequence/alignments, we are interested in the significance of certain match score. TFMPvalue provides the accurate calculation of P-value with  score threshold for Position Weight Matrices,  or the score with given P-value.  It is an interface to code originally made available by  Helene Touzet and Jean-Stephane Varre, 2007,  Algorithms Mol Biol:2, 15. <doi:10.1186/1748-7188-2-15>.",
+      "Authors@R": "person(given = \"Ge\", family = \"Tan\", role = c(\"aut\", \"cre\"), email = \"ge_tan@live.com\")",
+      "Copyright": "2007 LIFL-USTL-INRIA",
+      "Imports": [
+        "Rcpp(>= 0.11.1)"
+      ],
+      "Depends": [
+        "R (>= 4.5.0)"
+      ],
+      "Suggests": [
+        "testthat"
+      ],
+      "LinkingTo": [
+        "Rcpp"
+      ],
+      "License": "GPL-2",
+      "URL": "https://github.com/ge11232002/TFMPvalue",
+      "BugReports": "https://github.com/ge11232002/TFMPvalue/issues",
+      "Type": "Package",
+      "NeedsCompilation": "yes",
+      "Collate": "TFMPvalue-sc2pv.R TFMPvalue-pv2sc.R TFMPvalue-lazyScore.R util.R",
+      "Author": "Ge Tan [aut, cre]",
+      "Maintainer": "Ge Tan <ge_tan@live.com>",
+      "Repository": "CRAN"
     },
     "TxDb.Hsapiens.UCSC.hg19.knownGene": {
       "Package": "TxDb.Hsapiens.UCSC.hg19.knownGene",
@@ -9089,6 +9286,46 @@
       "Maintainer": "Simon Potter <simon@sjp.co.nz>",
       "Repository": "CRAN"
     },
+    "seqLogo": {
+      "Package": "seqLogo",
+      "Version": "1.78.0",
+      "Source": "Bioconductor",
+      "Title": "Sequence logos for DNA sequence alignments",
+      "Authors@R": "c(person(given=\"Oliver\", family=\"Bembom\",  role = c(\"aut\"), email = \"oliver.bembom@gmail.com\"), person(given=\"Robert\", family=\"Ivanek\",  role=c(\"aut\", \"cre\"), email=\"robert.ivanek@unibas.ch\",  comment=c(ORCID=\"0000-0002-8403-056X\")))",
+      "Description": "seqLogo takes the position weight matrix of a DNA sequence  motif and plots the corresponding sequence logo as introduced  by Schneider and Stephens (1990).",
+      "LazyLoad": "yes",
+      "Encoding": "UTF-8",
+      "Roxygen": "list(markdown = TRUE)",
+      "RoxygenNote": "7.1.2",
+      "Imports": [
+        "stats4",
+        "grDevices"
+      ],
+      "Depends": [
+        "R (>= 4.2)",
+        "methods",
+        "grid"
+      ],
+      "Suggests": [
+        "knitr",
+        "BiocStyle",
+        "rmarkdown",
+        "testthat"
+      ],
+      "BugReports": "https://github.com/ivanek/seqLogo/issues",
+      "VignetteBuilder": "knitr",
+      "Collate": "AllClasses.R AllGenerics.R pwm.R seqLogo.R",
+      "License": "LGPL (>= 2)",
+      "biocViews": "SequenceMatching",
+      "git_url": "https://git.bioconductor.org/packages/seqLogo",
+      "git_branch": "RELEASE_3_23",
+      "git_last_commit": "a7902a4",
+      "git_last_commit_date": "2026-04-28",
+      "Repository": "Bioconductor 3.23",
+      "NeedsCompilation": "no",
+      "Author": "Oliver Bembom [aut], Robert Ivanek [aut, cre] (ORCID: <https://orcid.org/0000-0002-8403-056X>)",
+      "Maintainer": "Robert Ivanek <robert.ivanek@unibas.ch>"
+    },
     "sessioninfo": {
       "Package": "sessioninfo",
       "Version": "1.2.3",
@@ -10085,6 +10322,79 @@
       "Author": "Davis Vaughan [aut, cre], Howard Hinnant [cph] (Author of the included date library), Posit Software, PBC [cph, fnd]",
       "Maintainer": "Davis Vaughan <davis@posit.co>",
       "Repository": "CRAN"
+    },
+    "universalmotif": {
+      "Package": "universalmotif",
+      "Version": "1.30.1",
+      "Source": "Bioconductor",
+      "Title": "Import, Modify, and Export Motifs with R",
+      "Authors@R": "c( person(c(\"Benjamin\", \"Jean-Marie\"), \"Tremblay\", role = c(\"aut\", \"cre\"), email = \"benjamin.tremblay@uwaterloo.ca\", comment = c(ORCID = \"0000-0002-7441-2951\")), person(\"Spencer\", \"Nystrom\", role = \"ctb\", comment = c(ORCID = \"0000-0003-1000-1579\")) )",
+      "URL": "https://bioconductor.org/packages/universalmotif/",
+      "BugReports": "https://github.com/bjmt/universalmotif/issues",
+      "Description": "Allows for importing most common motif types into R for use by functions provided by other Bioconductor motif-related packages. Motifs can be exported into most major motif formats from various classes as defined by other Bioconductor packages. A suite of motif and sequence manipulation and analysis functions are included, including enrichment, comparison, P-value calculation, shuffling, trimming, higher-order motifs, and others.",
+      "Depends": [
+        "R (>= 4.1.0)"
+      ],
+      "License": "GPL-3",
+      "Encoding": "UTF-8",
+      "Imports": [
+        "methods",
+        "stats",
+        "utils",
+        "MASS",
+        "ggplot2",
+        "yaml",
+        "IRanges",
+        "Rcpp",
+        "Biostrings",
+        "BiocGenerics",
+        "S4Vectors",
+        "rlang",
+        "grid",
+        "MatrixGenerics"
+      ],
+      "Suggests": [
+        "spelling",
+        "knitr",
+        "bookdown",
+        "TFBSTools",
+        "rmarkdown",
+        "MotifDb",
+        "testthat",
+        "BiocParallel",
+        "seqLogo",
+        "motifStack",
+        "dplyr",
+        "ape",
+        "ggtree",
+        "processx",
+        "ggseqlogo",
+        "cowplot",
+        "GenomicRanges",
+        "ggbio"
+      ],
+      "Enhances": [
+        "PWMEnrich",
+        "rGADEM"
+      ],
+      "LinkingTo": [
+        "Rcpp",
+        "RcppThread"
+      ],
+      "VignetteBuilder": "knitr",
+      "biocViews": "MotifAnnotation, MotifDiscovery, DataImport, GeneRegulation",
+      "RoxygenNote": "7.3.2",
+      "Roxygen": "list(markdown = TRUE, old_usage = TRUE)",
+      "Language": "en-GB",
+      "Collate": "'RcppExports.R' 'add_multifreq.R' 'compare_motifs.R' 'universalmotif-class.R' 'convert_motifs.R' 'convert_type.R' 'create_motif.R' 'create_sequences.R' 'data.R' 'enrich_motifs.R' 'filter_motifs.R' 'get_bkg.R' 'make_DBscores.R' 'merge_motifs.R' 'merge_similar.R' 'motif_clusters.R' 'motif_finder.R' 'motif_peaks.R' 'motif_pvalue.R' 'motif_rc.R' 'motif_tree.R' 'read_cisbp.R' 'read_homer.R' 'read_jaspar.R' 'read_matrix.R' 'read_meme.R' 'read_motifs.R' 'read_transfac.R' 'read_uniprobe.R' 'run_meme.R' 'sample_sites.R' 'scan_sequences.R' 'sequence_complexity.R' 'shuffle_motifs.R' 'shuffle_sequences.R' 'switch_alph.R' 'trim_motifs.R' 'universalmotif-methods.R' 'universalmotif.R' 'universalmotif_df.R' 'utils-internal.R' 'utils-motif.R' 'utils-sequence.R' 'view_logo.R' 'view_motifs.R' 'write_homer.R' 'write_jaspar.R' 'write_matrix.R' 'write_meme.R' 'write_motifs.R' 'write_transfac.R' 'zzz.R'",
+      "git_url": "https://git.bioconductor.org/packages/universalmotif",
+      "git_branch": "RELEASE_3_23",
+      "git_last_commit": "d18451d",
+      "git_last_commit_date": "2026-05-03",
+      "Repository": "Bioconductor 3.23",
+      "NeedsCompilation": "yes",
+      "Author": "Benjamin Jean-Marie Tremblay [aut, cre] (ORCID: <https://orcid.org/0000-0002-7441-2951>), Spencer Nystrom [ctb] (ORCID: <https://orcid.org/0000-0003-1000-1579>)",
+      "Maintainer": "Benjamin Jean-Marie Tremblay <benjamin.tremblay@uwaterloo.ca>"
     },
     "utf8": {
       "Package": "utf8",

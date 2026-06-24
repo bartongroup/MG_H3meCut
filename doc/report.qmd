@@ -448,6 +448,17 @@ pl2 <- tar_read(fig_npeaks_broad) + scale_y_continuous(expand = expansion(0, 0.0
 plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 ```
 
+```{r}
+#| label: fig-peak-coverage
+#| fig-cap: Genome coverage by detected peaks per sample, for (A) narrow and (B) broad peaks.
+#| fig-width: 8
+#| fig-height: 4
+pl1 <- tar_read(fig_peak_coverage_narrow)
+pl2 <- tar_read(fig_peak_coverage_broad)
+plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B")) 
+```
+
+
 @fig-peak-width shows distribution of peak widths, across all samples, for narrow and broad peaks. Both distributions are similar for widths < 1000 bp, but broad peaks have a long tail of very wide peaks, extending well over 10,000 bp.
 
 ```{r}
@@ -490,27 +501,29 @@ Only broad peak results are shown in the following sections and in the Shiny app
 
 ## Peak annotations
 
-We used to different packages to annotate peaks: *annotatr* and *ChIPseeker*. Both packages use different approaches and different genomic features for annotation. In particular, *ChIPseeker* includes intergenic regions, while *annotatr* does not. Also, *ChIPseeker* removes redundant hits (peak spanning multiple features, e.g. promoter-exon-intron; parallel annotations from alternative transcripts), while *annotatr* provides all redundant hits. Hence, *annotatr* results were reduced by using canonical transcripts only.
+We used to different packages to annotate peaks: *annotatr* and *ChIPseeker*. Both packages use different approaches and different genomic features for annotation. In particular, *ChIPseeker* includes intergenic regions, while *annotatr* does not. Also, *ChIPseeker* removes redundant hits (peak spanning multiple features, e.g. promoter-exon-intron; parallel annotations from alternative transcripts), while *annotatr* provides all redundant hits, including all hits from all transcripts. To make results more comparable, *annotatr* results were reduced by using canonical transcripts only.
 
 Results of annotations for all peaks are shown in @fig-peak-annotations. A set of 100,000 randomly located peaks with widths randomly drawn from the original data was used for comparison. Both methods show similar trends, with most peaks located in intronic and intergenic regions. There are no obvious large-scale differences between conditions.
 
 ```{r}
 #| label: fig-peak-annotations
-#| fig-cap: Peak annotations of top 30,000 peaks using (A) *annotatr* package and (B) *ChIPseeker* package, for broad peaks. The last bar shows annotations of 100,000 randomly located peaks with widths randomly drawn from the original data.
+#| fig-cap: Peak annotations of top 30,000 peaks using (A) *annotatr* package, (B) *ChIPseeker* package and (C) *ChIPseeker* package with downstream and distal peaks removed, for broad peaks. The last bar shows annotations of 100,000 randomly located peaks with widths randomly drawn from the original data.
 #| fig-width: 8
-#| fig-height: 4
+#| fig-height: 8
 pl1 <- tar_read(fig_groups_annotatr_broad)
 pl2 <- tar_read(fig_groups_chipseeker_broad)
-plot_grid(pl1, pl2, nrow = 1, labels = c("A ", "B"), rel_widths = c(1, 1.1)) 
+pl3 <- tar_read(fig_groups_chipseeker_red_broad)
+plot_grid(pl1, pl2, pl3, nrow = 2, labels = c("A ", "B", "C"), rel_widths = c(1, 1.1)) 
 ```
 
-*ChIPseeker* provided, among other annotations, distance to the nearest TSS. @fig-peaks-tss shows the distributions of these distances. This figure strongly suggests that our peaks are mostly randomly distributed.
+*ChIPseeker* provided, among other annotations, distance to the nearest TSS. @fig-peaks-tss shows the distributions of these distances. 
 
 ```{r}
 #| label: fig-peaks-tss
-#| fig-cap: Distance to the nearest TSS according to *ChIPseeker* annotations in four conditions, using broad peaks. Only distances less than ±300 bp from the TSS are shown.
-#| out.width: 50%
-knitr::include_graphics("images/groups_tss.png") 
+#| fig-cap: Coverage of peaks around the TSS in four conditions, using all broad peaks.
+#| fig-width: 8
+#| fig-height: 3
+tar_read(fig_groups_tss_broad) 
 ```
 
 ## Assigning genes to peaks
@@ -562,6 +575,7 @@ tar_read(fig_up_down_full_libs_broad)
 #| fig-height: 4
 tar_read(fig_dec_chipseeker_full_libs_broad) 
 ```
+
 
 @fig-deg-biotype-full-libs-broad shows the distribution of gene biotypes, for differentially binding peaks in genes or their promoters. For comparison, @fig-all-biotype shows the distribution of biotypes for all genes. Please note that 
 
@@ -629,6 +643,15 @@ tar_read(fig_up_down_groups_libs_broad)
 #| fig-height: 5
 tar_read(fig_dec_chipseeker_groups_libs_broad) 
 ```
+
+```{r}
+#| label: fig-dec-chipseeker-err-groups-libs-broad
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. 95% confidence intervals of a proportions are shown."
+#| fig-width: 6
+#| fig-height: 5
+tar_read(fig_dec_chipseeker_err_groups_libs_broad) 
+```
+
 
 #### Gene set enrichment
 
@@ -824,6 +847,34 @@ tb |> mutate(
     columns = c(5, 6, 7, 8),
     n_sigfig = 3
   )
+```
+
+
+# Search for motifs
+
+There are hundreds of thousands of peaks detected in each condition (see @fig-peak-width). They cover a substantial portion of the genome, about 5-6% (see @fig-peak-coverage). Searching for motifs in hundreds of megabases of genome space would be futile - returning all possible motifs everywhere.
+
+Therefore, we decided to focus on differentially binding peaks only for this exercise. *DiffBind* peaks with $FDR < 0.01$ and $|\log_2 FC| > 1$ using pairwise comparison were selected. This limits the search space to 100-300 peaks per contrast. DNA sequences for these peaks were extracted from the human genome used for mapping.  
+
+`r targets::tar_read(n_tf_motifs)` CORE vertebrate motifs were downloaded from the [JASPAR 2024](https://jaspar.elixir.no/) database, containing manually curated high-quality and non-redundant DNA-binding profiles for transcription factors (TFs).
+
+R package [*universalmotif*](https://joss.theoj.org/papers/10.21105/joss.07012) was used to search these motifs in the peak sequences. Every DB peak considered was found to contain multiple motifs. In fact, there were typically 50-60 unique motifs found in each peak (@tbl-motif-stats) which increases to 60-80 for motifs found only in promoter regions (@tbl-motif-stats-promoters).
+
+```{r}
+#| label: tbl-motif-stats
+#| tbl-cap: Summary of motif search results in DB peaks.
+tar_read(motif_stats) |> 
+  gt() |> 
+  fmt_number(columns = `Motifs per peak`, n_sigfig = 3)
+```
+
+
+```{r}
+#| label: tbl-motif-stats-promoters
+#| tbl-cap: Summary for motif search in DB peaks, but for peaks in promoter regions only.
+tar_read(motif_stats_promoters) |> 
+  gt() |> 
+  fmt_number(columns = `Motifs per peak`, n_sigfig = 3)
 ```
 
 # Resources

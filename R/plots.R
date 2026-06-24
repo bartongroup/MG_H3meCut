@@ -255,7 +255,8 @@ plot_group_peak_tss <- function(an, group_var = "group", n_top = 30000, rand_an 
 }
 
 plot_group_peak_annotations <- function(an, group_var = "group", annot_var = "annotation",
-                                        n_top = 30000, rand_an = NULL, palette = 1, order_annot = FALSE) {
+                                        n_top = 30000, rand_an = NULL, palette = 1,
+                                        order_annot = FALSE, stacked = TRUE) {
   
   d <- an |> 
     mutate(grp = get(group_var), ann = get(annot_var))
@@ -286,10 +287,23 @@ plot_group_peak_annotations <- function(an, group_var = "group", annot_var = "an
   }
 
   dc <- d |> 
-    count(grp, ann) |> 
-    group_by(grp) |> 
-    mutate(prop = n / sum(n)) |> 
-    ungroup()
+    count(grp, ann, .drop = FALSE) |> 
+    group_split(grp) |> 
+    map(function(w) {
+      w |> 
+        mutate(tot = sum(n)) |> 
+        select(grp, ann, n, tot) |> 
+        nest(data = c(n, tot)) |> 
+        mutate(
+          tst = map(data, ~prop.test(.x$n, .x$tot)),
+          tidied = map(tst, tidy)
+        ) |> 
+        unnest(tidied) |> 
+        unnest(data) |> 
+        select(-tst)
+    }) |> 
+    list_rbind() |> 
+    rename(prop = estimate)
 
   if(order_annot)
     dc <- dc |> mutate(ann = fct_reorder(ann, -n))
@@ -308,22 +322,35 @@ plot_group_peak_annotations <- function(an, group_var = "group", annot_var = "an
     pal <- RColorBrewer::brewer.pal(12, "Paired")
   }
 
+  if(stacked) {
+    pos <- "stack"
+    top_margin <- 0
+  } else {
+    pos <- position_dodge(width = 0.9)
+    top_margin <- 0.03
+  }
+
   env <- new.env(parent = globalenv())
   env$dc <- dc
   env$pal <- pal
+  env$pos <- pos
+  env$stacked <- stacked
+  env$top_margin <- top_margin
 
   with(env, {
-    dc |> 
+    pl <- dc |> 
       ggplot(aes(x = grp, y = prop, fill = ann)) +
       th() +
-      theme(
-         axis.text.x = element_text(angle = 45, hjust = 1)
-      ) +
-      geom_col(position = "stack") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      geom_col(position = pos) +
       #scale_fill_manual(values = okabe_ito_palette) +
       scale_fill_manual(values = pal) +
-      scale_y_continuous(expand = c(0, 0)) +
+      scale_y_continuous(expand = expansion(mult = c(0, top_margin))) +
       labs(x = NULL, y = "Proportion", fill = "Annotation")
+    if(!stacked) {
+      pl <- pl + geom_errorbar(aes(ymin = conf.low, ymax = conf.high), position = pos, width = 0.2)
+    }
+    pl
   })
 
 }
@@ -624,3 +651,65 @@ plot_all_genes_biotype <- function() {
     add_column(fdr = 0, contrast = "All genes") |> 
     plot_gene_biotype_distribution()
 } 
+
+
+get_pileup_from_peaks <- function(pks, max_dist) {
+  regions <- pks |> 
+    distinct(grp, start, end, gene_start, distance_to_tss, gene_strand) |> 
+    mutate(
+      rel_start = if_else(gene_strand == 1, start - gene_start, gene_start - end),
+      rel_end = if_else(gene_strand == 1, end - gene_start, gene_start - start)
+    ) |> 
+    filter(rel_start <= max_dist, rel_end >= -max_dist) |>
+    mutate(
+      rel_start = pmax(rel_start, -max_dist),
+      rel_end   = pmin(rel_end, max_dist),
+      end_event = rel_end + 1L
+    )
+ 
+  pileup <- bind_rows(
+    regions |> transmute(grp, pos = rel_start, delta = 1L),
+    regions |> transmute(grp, pos = end_event, delta = -1L)
+  ) |>
+    group_by(grp, pos) |>
+    summarise(delta = sum(delta), .groups = "drop") |>
+    group_by(grp) |>
+    complete(pos = -max_dist:(max_dist + 1L), fill = list(delta = 0L)) |>
+    arrange(pos, .by_group = TRUE) |>
+    mutate(coverage = cumsum(delta)) |>
+    filter(pos <= max_dist) |>
+    ungroup()
+
+  pileup
+}
+
+plot_peaks_tss <- function(pks, rand_an = NULL, max_dist = 3000, ncol = 4, group_var = "group") {
+
+  pks <- pks |> 
+    mutate(grp = get(group_var))
+
+  if(!is.null(rand_an)) {
+    pks <- pks |> 
+      bind_rows(rand_an |> mutate(grp = "Random", grp = fct_relevel(grp, "Random", after = Inf)))
+  }
+
+  env <- new.env(parent = globalenv())
+  env$pileup <- get_pileup_from_peaks(pks, max_dist)
+  env$ncol <- ncol
+  
+  with(env, {
+    pileup |>
+      ggplot(aes(x = pos, y = coverage)) +
+      th() +
+      theme(
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()
+      ) +
+      geom_vline(xintercept = 0, color = "brown", alpha = 0.3) +
+      geom_step() +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.04)), limits = c(0, NA)) +
+      facet_wrap(~grp, scales = "free_y", ncol = ncol) +
+      labs(x = "Position relative to TSS", y = "Coverage")
+  })
+
+}

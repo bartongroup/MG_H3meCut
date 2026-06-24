@@ -62,17 +62,20 @@ targets_main <- function() {
       peaks = read_peak_files(config, metadata3, format = TYPE),
       fig_npeaks = plot_number_of_peaks(peaks, metadata3),
       fig_peak_width = plot_peak_width_distribution(peaks),
+      fig_peak_coverage = plot_peak_coverage(peaks, chrom_sizes, metadata3),
 
       # Annotate all peaks
       peaks_annotatr_raw = annotate_peaks_annotatr(peaks, annotations),
       peaks_annotatr = reduce_annotatr(peaks_annotatr_raw, trans),
       peaks_chipseeker = annotate_peaks_chipseeker(peaks),
+      peaks_chipseeker_red = peaks_chipseeker |> dplyr::filter(!(annotation %in% c("Downstream", "Distal Intergenic"))),
       peaks_rmsk = annotate_peaks_rmsk(peaks, rmsk),
 
       # Random peaks
       prand = make_random_regions(peaks, chrom_sizes, n_regions = 100000),
       prand_annotatr = annotate_peaks_annotatr(prand, annotations) |> reduce_annotatr(trans),
       prand_chipseeker = annotate_peaks_chipseeker(prand),
+      prand_chipseeker_red = prand_chipseeker |> dplyr::filter(!(annotation %in% c("Downstream", "Distal Intergenic"))),
       prand_rmsk = annotate_peaks_rmsk(prand, rmsk),
 
       fig_annotatr = plot_peak_annotatios(peaks_annotatr),
@@ -81,9 +84,10 @@ targets_main <- function() {
       # These are proper figures
       fig_groups_annotatr = plot_group_peak_annotations(peaks_annotatr, rand_an = prand_annotatr, palette = 2),
       fig_groups_chipseeker = plot_group_peak_annotations(peaks_chipseeker, rand_an = prand_chipseeker),
+      fig_groups_chipseeker_red = plot_group_peak_annotations(peaks_chipseeker_red, rand_an = prand_chipseeker_red),
       fig_groups_rmsk = plot_group_peak_annotations(peaks_rmsk, annot_var = "rep_category", rand_an = prand_rmsk, palette = 3),
-
-      png_groups_tss = plot_group_peak_tss(peaks_chipseeker, rand_an = prand_chipseeker, max_dist = 300) |> gs("groups_tss", 6, 4),
+      
+      fig_groups_tss = plot_peaks_tss(peaks_chipseeker, rand_an = prand_chipseeker, max_dist = 3000, ncol = 5),
 
       # Prepare for DiffBind
       meta_db = make_diffbind_metadata(metadata3, config, type = TYPE),
@@ -137,6 +141,7 @@ targets_main <- function() {
 
         fig_dec_annotatr = plot_group_peak_annotations(dec_annotatr_sig, group_var = "contrast", palette = 2, n_top = NULL),
         fig_dec_chipseeker = plot_group_peak_annotations(dec_chipseeker_sig, group_var = "contrast", n_top = NULL),
+        fig_dec_chipseeker_err = plot_group_peak_annotations(dec_chipseeker_sig, group_var = "contrast", n_top = NULL, stacked = FALSE),
         fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk_sig, fdr_limit = 0.01),
         fig_dec_rmsk_all = plot_peak_rmsk(dec_rmsk),
 
@@ -153,13 +158,22 @@ targets_main <- function() {
 
   )
 
+  # This is done only for ChIPseeker, differential binding in pair-wise comparison significant genes,
+  # lib-size normalisation, broad peaks
   search_for_motifs <- tar_plan(
+    dec_for_motifs = dec_chipseeker_sig_groups_libs_narrow,
+
     tar_target(genome_file, file.path(config$data_path, config$dir$genome, "Homo_sapiens.canonical.fa"), format = "file"),
-    db_ranges = dec_chipseeker_sig_groups_libs_broad |> distinct(peak_id, chr, start, end, strand),
+    db_ranges = dec_for_motifs |> dplyr::distinct(peak_id, chr, start, end, strand),
     db_seqs = fetch_range_sequences(genome_file, db_ranges),
     tf_motifs = get_jaspar_matrix(),
+    n_tf_motifs = tf_motifs |> length(),
     tf_res = search_sequences_for_motifs(db_seqs, tf_motifs),
-    db_res = dec_chipseeker_sig_groups_libs_broad |> dplyr::left_join(tf_res |> dplyr::mutate(peak_id = as.character(peak_id)), by = "peak_id")
+    tf_res_sig = tf_res |> dplyr::filter(motif_fdr < 0.01),
+    dec_res = dec_for_motifs |> dplyr::left_join(tf_res_sig |> dplyr::mutate(peak_id = as.character(peak_id)), by = "peak_id", relationship = "many-to-many"),
+
+    motif_stats = get_motif_stats(dec_res, dec_for_motifs),
+    motif_stats_promoters = get_motif_stats(dec_res |> dplyr::filter(annotation == "Promoter"), dec_for_motifs |> dplyr::filter(annotation == "Promoter"))
   )
 
 
