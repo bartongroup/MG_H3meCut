@@ -254,66 +254,13 @@ plot_group_peak_tss <- function(an, group_var = "group", n_top = 30000, rand_an 
     labs(x = NULL, y = "Distance to TSS (kb)")
 }
 
-plot_group_peak_annotations <- function(an, group_var = "group", annot_var = "annotation",
-                                        n_top = 30000, rand_an = NULL, palette = 1,
-                                        order_annot = FALSE, stacked = TRUE) {
+
+plot_group_peak_annotations <- function(an, group_var = "group", annot_var = "annotation", rand_an = NULL,
+                                        n_top = 30000, order_annot = FALSE, palette = 1, stacked = TRUE,
+                                        plot_proportions = TRUE) {
   
-  d <- an |> 
-    mutate(grp = get(group_var), ann = get(annot_var))
+  dc <- tabulate_annotations(an, group_var, annot_var, n_top, rand_an, order_annot)
 
-  # Some data don't have signal
-  if(!("signal" %in% names(d))) {
-    d <- d |> mutate(signal = 0)
-  }
-
-  d <- d |> 
-    distinct(grp, peak_id, ann, signal)
-
-  if(!is.null(n_top)) {
-    d <- d |> 
-      group_by(grp) |> 
-      slice_max(signal, n = n_top) |>
-      ungroup() |> 
-      select(-signal)
-  }
-
-  if(!is.null(rand_an)) {
-    ra <- rand_an |> 
-      mutate(ann = get(annot_var)) |> 
-      select(peak_id, ann) |> 
-      mutate(grp = "Random")
-    d <- d |> 
-      bind_rows(ra)
-  }
-
-  dc <- d |> 
-    count(grp, ann, .drop = FALSE) |> 
-    group_split(grp) |> 
-    map(function(w) {
-      w |> 
-        mutate(tot = sum(n)) |> 
-        select(grp, ann, n, tot) |> 
-        nest(data = c(n, tot)) |> 
-        mutate(
-          tst = map(data, ~prop.test(.x$n, .x$tot)),
-          tidied = map(tst, tidy)
-        ) |> 
-        unnest(tidied) |> 
-        unnest(data) |> 
-        select(-tst)
-    }) |> 
-    list_rbind() |> 
-    rename(prop = estimate)
-
-  if(order_annot)
-    dc <- dc |> mutate(ann = fct_reorder(ann, -n))
-  
-  if(annot_var == "rep_category") {
-    dc <- dc |>
-      mutate(ann = factor(ann, levels = c("SINE", "LINE", "LTR", "Simple_repeat", "DNA", "Low_complexity", "Satellite", "Retroposon", 
-"Other")))
-  }
-    
   if(palette == 1) {
     pal <- annot_palette
   } else if(palette == 2) {
@@ -330,23 +277,33 @@ plot_group_peak_annotations <- function(an, group_var = "group", annot_var = "an
     top_margin <- 0.03
   }
 
+   if(plot_proportions) {
+     dc <- dc |> mutate(y = prop)
+     ylab <- "Proportion"
+   } else {
+     dc <- dc |> mutate(y = n)
+     top_margin <- 0.03
+     ylab <- "Count"
+   }
+
   env <- new.env(parent = globalenv())
   env$dc <- dc
   env$pal <- pal
   env$pos <- pos
   env$stacked <- stacked
   env$top_margin <- top_margin
+  env$ylab <- ylab
 
   with(env, {
     pl <- dc |> 
-      ggplot(aes(x = grp, y = prop, fill = ann)) +
+      ggplot(aes(x = grp, y = y, fill = ann)) +
       th() +
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
       geom_col(position = pos) +
       #scale_fill_manual(values = okabe_ito_palette) +
       scale_fill_manual(values = pal) +
       scale_y_continuous(expand = expansion(mult = c(0, top_margin))) +
-      labs(x = NULL, y = "Proportion", fill = "Annotation")
+      labs(x = NULL, y = ylab, fill = "Annotation")
     if(!stacked) {
       pl <- pl + geom_errorbar(aes(ymin = conf.low, ymax = conf.high), position = pos, width = 0.2)
     }

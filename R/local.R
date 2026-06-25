@@ -252,3 +252,102 @@ get_motif_stats <- function(dec_res, dec_for_motifs) {
     inner_join(d3, by = "contrast") |>
     inner_join(d4, by = "contrast")
 }
+
+
+
+tabulate_annotations <- function(an, group_var, annot_var, n_top = NULL, rand_an = NULL, order_annot = FALSE) {
+  d <- an |> 
+    mutate(grp = get(group_var), ann = get(annot_var))
+
+  # Some data don't have signal
+  if(!("signal" %in% names(d))) {
+    d <- d |> mutate(signal = 0)
+  }
+
+  d <- d |> 
+    distinct(grp, peak_id, ann, signal)
+
+  if(!is.null(n_top)) {
+    d <- d |> 
+      group_by(grp) |> 
+      slice_max(signal, n = n_top) |>
+      ungroup() |> 
+      select(-signal)
+  }
+
+  if(!is.null(rand_an)) {
+    ra <- rand_an |> 
+      mutate(ann = get(annot_var)) |> 
+      select(peak_id, ann) |> 
+      mutate(grp = "Random")
+    d <- d |> 
+      bind_rows(ra)
+  }
+
+  dc <- d |> 
+    count(grp, ann, .drop = FALSE) |> 
+    group_split(grp) |> 
+    map(function(w) {
+      w |> 
+        mutate(tot = sum(n)) |> 
+        select(grp, ann, n, tot) |> 
+        nest(data = c(n, tot)) |> 
+        mutate(
+          tst = map(data, ~prop.test(.x$n, .x$tot)),
+          tidied = map(tst, tidy)
+        ) |> 
+        unnest(tidied) |> 
+        unnest(data) |> 
+        select(-tst)
+    }) |> 
+    list_rbind() |> 
+    rename(prop = estimate)
+
+  if(order_annot)
+    dc <- dc |> mutate(ann = fct_reorder(ann, -n))
+  
+  if(annot_var == "rep_category") {
+    dc <- dc |>
+      mutate(ann = factor(ann, levels = c("SINE", "LINE", "LTR", "Simple_repeat", "DNA", "Low_complexity", "Satellite", "Retroposon", 
+"Other")))
+  }
+
+  dc
+}
+
+# Fisher's test of each annotation and group against all others
+# dc created by tabulate_annotations, must contain columns 'ann', 'grp' and 'n'
+annot_group_test <- function(dc) {
+  annots <- unique(as.character(dc$ann))
+  map(annots, function(ant) {
+    # for each annotation, test against all others
+    d1 <- dc |> 
+      filter(ann == ant) |> 
+      select(grp, n_sel = n)
+    d2 <- dc |> 
+      filter(ann != ant) |> 
+      group_by(grp) |> 
+      summarise(n_else = sum(n))
+    d <- inner_join(d1, d2, by = "grp")
+    # for each group test against others
+    grps <- unique(as.character(d$grp))
+    map(grps, function(gr) {
+      x1 <- d |> 
+        filter(grp == gr)
+      x2 <- d |> 
+        filter(grp != gr) |> 
+        summarise(n_sel = sum(n_sel), n_else = sum(n_else)) |> 
+        mutate(grp = "else")
+      x <- bind_rows(x1, x2) |> 
+        select(n_sel, n_else) |> 
+        as.matrix()
+      fisher.test(x, alternative = "two.sided")  |> 
+        broom::tidy() |> 
+        select(odds_ratio = estimate, ci_lo = conf.low, ci_up = conf.high, p_value = p.value) |> 
+        add_column(ann = ant, grp = gr, .before = 1)
+    }) |> 
+      list_rbind()
+  }) |> 
+    list_rbind() |> 
+    mutate(fdr = p.adjust(p_value, method = "BH"))
+}

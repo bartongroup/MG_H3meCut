@@ -1,22 +1,94 @@
-mn_plot_peak_annotatios <- function(an, ncol = 4, group_var = "contrast", annot_var = "annotation") {
-
-  d <- an |> 
-    mutate(grp = get(group_var), ann = get(annot_var)) |> 
-    distinct(grp, peak_id, ann) |> 
-    count(grp, ann, .drop = FALSE) 
+mn_plot_group_peak_annotations <- function(an, group_var = "group", annot_var = "annotation",
+                                        n_top = 30000, rand_an = NULL, palette = 1,
+                                        order_annot = FALSE, stacked = TRUE) {
   
-  d |> 
-      ggplot(aes(x = ann, y = n, fill = ann)) +
+  d <- an |> 
+    mutate(grp = get(group_var), ann = get(annot_var))
+
+  # Some data don't have signal
+  if(!("signal" %in% names(d))) {
+    d <- d |> mutate(signal = 0)
+  }
+
+  d <- d |> 
+    distinct(grp, peak_id, ann, signal)
+
+  if(!is.null(n_top)) {
+    d <- d |> 
+      group_by(grp) |> 
+      slice_max(signal, n = n_top) |>
+      ungroup() |> 
+      select(-signal)
+  }
+
+  if(!is.null(rand_an)) {
+    ra <- rand_an |> 
+      mutate(ann = get(annot_var)) |> 
+      select(peak_id, ann) |> 
+      mutate(grp = "Random")
+    d <- d |> 
+      bind_rows(ra)
+  }
+
+  dc <- d |> 
+    count(grp, ann, .drop = FALSE) |> 
+    group_split(grp) |> 
+    map(function(w) {
+      w |> 
+        mutate(tot = sum(n)) |> 
+        select(grp, ann, n, tot) |> 
+        nest(data = c(n, tot)) |> 
+        mutate(
+          tst = map(data, ~prop.test(.x$n, .x$tot)),
+          tidied = map(tst, tidy)
+        ) |> 
+        unnest(tidied) |> 
+        unnest(data) |> 
+        select(-tst)
+    }) |> 
+    list_rbind() |> 
+    rename(prop = estimate)
+
+  if(order_annot)
+    dc <- dc |> mutate(ann = fct_reorder(ann, -n))
+  
+  if(annot_var == "rep_category") {
+    dc <- dc |>
+      mutate(ann = factor(ann, levels = c("SINE", "LINE", "LTR", "Simple_repeat", "DNA", "Low_complexity", "Satellite", "Retroposon", 
+"Other")))
+  }
+    
+  if(palette == 1) {
+    pal <- annot_palette
+  } else if(palette == 2) {
+    pal <- c("#FDBF6F", annot_palette)
+  } else if(palette == 3) {
+    pal <- RColorBrewer::brewer.pal(12, "Paired")
+  }
+
+  if(stacked) {
+    pos <- "stack"
+    top_margin <- 0
+  } else {
+    pos <- position_dodge(width = 0.9)
+    top_margin <- 0.03
+  }
+
+    pl <- dc |> 
+      ggplot(aes(x = grp, y = prop, fill = ann)) +
       th() +
-      theme(
-        legend.position = "none",
-        axis.text.x = element_text(angle = 45, hjust = 1)
-      ) +
-      geom_col() +
-      facet_wrap(~grp, ncol = ncol, scales = "free_y") +
-      scale_fill_brewer(palette = "Paired") +
-      scale_y_continuous(expand = expansion(mult = c(0, 0.03)), labels = scientific_10) +
-      labs(x = NULL, y = "Count")
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      geom_col(position = pos) +
+      #scale_fill_manual(values = okabe_ito_palette) +
+      scale_fill_manual(values = pal) +
+      scale_y_continuous(expand = expansion(mult = c(0, top_margin))) +
+      labs(x = NULL, y = "Proportion", fill = "Annotation")
+    if(!stacked) {
+      pl <- pl + geom_errorbar(aes(ymin = conf.low, ymax = conf.high), position = pos, width = 0.2)
+    }
+    
+  pl
+
 }
 
 

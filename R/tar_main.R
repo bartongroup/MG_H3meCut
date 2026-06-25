@@ -15,6 +15,8 @@ targets_main <- function() {
   setup_experiment <- tar_plan(
     tar_target(config_file, "config.json", format = "file"),
     config = jsonlite::read_json(config_file),
+    tar_target(params_file, "params.json", format = "file"),
+    params = jsonlite::read_json(params_file),
     tar_target(sample_file, config$sample_file, format = "file"),
     metadata = read_metadata(sample_file),
     metadata3 = metadata |> dplyr::filter(experiment == "Me3") |> droplevels(),
@@ -135,22 +137,22 @@ targets_main <- function() {
         dec_chipseeker = annotate_peaks_chipseeker(dec),
         dec_rmsk = annotate_peaks_rmsk(dec, rmsk),
 
-        dec_annotatr_sig = dec_annotatr |> dplyr::filter(fdr < 0.01 & abs(log_fc) > 1),
-        dec_chipseeker_sig = dec_chipseeker |> dplyr::filter(fdr < 0.01 & abs(log_fc) > 1),
-        dec_rmsk_sig = dec_rmsk |> dplyr::filter(fdr < 0.01 & abs(log_fc) > 1),
+        dec_annotatr_sig = dec_annotatr |> dplyr::filter(fdr < params$fdr_limit & abs(log_fc) > params$logfc_limit),
+        dec_chipseeker_sig = dec_chipseeker |> dplyr::filter(fdr < params$fdr_limit & abs(log_fc) > params$logfc_limit),
+        dec_rmsk_sig = dec_rmsk |> dplyr::filter(fdr < params$fdr_limit & abs(log_fc) > params$logfc_limit),
 
-        fig_dec_annotatr = plot_group_peak_annotations(dec_annotatr_sig, group_var = "contrast", palette = 2, n_top = NULL),
-        fig_dec_chipseeker = plot_group_peak_annotations(dec_chipseeker_sig, group_var = "contrast", n_top = NULL),
-        fig_dec_chipseeker_err = plot_group_peak_annotations(dec_chipseeker_sig, group_var = "contrast", n_top = NULL, stacked = FALSE),
-        fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk_sig, fdr_limit = 0.01),
+        fig_dec_annotatr = plot_group_peak_annotations(dec_annotatr_sig, group_var = "contrast_direction", palette = 2, n_top = NULL),
+        fig_dec_chipseeker = plot_group_peak_annotations(dec_chipseeker_sig, group_var = "contrast_direction", n_top = NULL),
+        fig_dec_chipseeker_err = plot_group_peak_annotations(dec_chipseeker_sig, group_var = "contrast_direction", n_top = NULL, stacked = FALSE),
+        fig_dec_rmsk_da = plot_peak_rmsk(dec_rmsk_sig, fdr_limit = params$fdr_limit),
         fig_dec_rmsk_all = plot_peak_rmsk(dec_rmsk),
 
-        fig_dec_rmsk = plot_group_peak_annotations(dec_rmsk_sig, group_var = "contrast", annot_var = "rep_category", n_top = NULL, palette = 3),
+        fig_dec_rmsk = plot_group_peak_annotations(dec_rmsk_sig, group_var = "contrast_direction", annot_var = "rep_category", n_top = NULL, palette = 3),
 
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
 
         deg = prepare_de_genes(dec_chipseeker),
-        fig_deg_biotype = plot_gene_biotype_distribution(deg, fdr_limit = 0.01),
+        fig_deg_biotype = plot_gene_biotype_distribution(deg, fdr_limit = params$fdr_limit),
         gse = fgsea_all_terms(deg, fterms, rank_expr = "-log_fc * log10(p_value)"),
         gse_tab = tabulate_gsea(gse, gns)
       )
@@ -161,7 +163,7 @@ targets_main <- function() {
   # This is done only for ChIPseeker, differential binding in pair-wise comparison significant genes,
   # lib-size normalisation, broad peaks
   search_for_motifs <- tar_plan(
-    dec_for_motifs = dec_chipseeker_sig_groups_libs_narrow,
+    dec_for_motifs = dec_chipseeker_sig_groups_libs_broad,
 
     tar_target(genome_file, file.path(config$data_path, config$dir$genome, "Homo_sapiens.canonical.fa"), format = "file"),
     db_ranges = dec_for_motifs |> dplyr::distinct(peak_id, chr, start, end, strand),
@@ -215,23 +217,17 @@ targets_main <- function() {
 
   for_manuscript <- tar_plan(
     mn_fdr_limit = 0.01,
-    mn_logfc_limit = 0.76,
+    mn_logfc_limit = 0.58,
     mn_ctr = c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl", "iPS_SETDB1-iPS_Ctrl"),
 
     png_volcano = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast %in% mn_ctr), fdr_limit = mn_fdr_limit, log_fc_limit = mn_logfc_limit) |> gp("volcano", width = 7, height = 3),
 
-    tar_map(
-      values = tibble::tibble(DIRECTION = c("up", "down")),
-      names = DIRECTION,
-
-      tar_plan(
-        mn_dec = filter_dec(dec_chipseeker_groups_libs_broad, ctrs = mn_ctr, fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit, direction = DIRECTION),
-        mn_dec_rmsk = filter_dec(dec_rmsk_groups_libs_broad, ctrs = mn_ctr, fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit, direction = DIRECTION),
-
-        png_chipseeker_annotations = mn_plot_peak_annotatios(mn_dec) |> gp(paste0("chipseeker_annotations_", DIRECTION), width = 7, height = 3.5),
-        png_rmsk_da = plot_peak_rmsk(mn_dec_rmsk , fdr_limit = mn_logfc_limit)|> gp(paste0("rmsk_da_", DIRECTION), width = 7, height = 4.5),
-      )
-    )
+    png_groups_chipseeker = plot_group_peak_annotations(peaks_chipseeker_broad, rand_an = prand_chipseeker_broad) |> 
+      gp("chipseeker_annotations", width = 4, height = 4),
+    png_chipseeker_annotations = mn_plot_group_peak_annotations(dec_chipseeker_sig_groups_libs_broad, group_var = "contrast_direction", n_top = NULL) |>
+      gp("chipseeker_da", width = 4, height = 4),
+    png_chipseeker_rmsk = plot_group_peak_annotations(dec_rmsk_sig_groups_libs_broad, group_var = "contrast_direction", annot_var = "rep_category", n_top = NULL, palette = 3) |>
+      gp("rmsk_da", width = 4, height = 4)
     
   )
 
@@ -258,7 +254,7 @@ targets_main <- function() {
     read_data,
     map_peaks,
     map_diffbind,
-    search_for_motifs,
+    #search_for_motifs,
     for_report,
     for_manuscript,
     for_shiny

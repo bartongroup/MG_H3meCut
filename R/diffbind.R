@@ -176,8 +176,10 @@ extract_de_results <- function(dbc) {
     ) |> 
     mutate(
       log_fc = -log_fc,  # They provide group1 - group2, but we prefer group2 - group1
+      direction = if_else(log_fc > 0, "up", "down"),
       peak_id = str_glue("{chr}:{start}-{end}"), .before = 1
-    )
+    ) |> 
+    unite(contrast_direction, contrast, direction, sep = "_", remove = FALSE)
 }
 
 prepare_de_genes <- function(dec, keep_annot = c("Intron", "Exon", "Promoter (<=1kb)", "3' UTR", "5' UTR")) {
