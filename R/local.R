@@ -315,39 +315,46 @@ tabulate_annotations <- function(an, group_var, annot_var, n_top = NULL, rand_an
   dc
 }
 
-# Fisher's test of each annotation and group against all others
+
+# Fisher's test of each annotation and group against pooled others
 # dc created by tabulate_annotations, must contain columns 'ann', 'grp' and 'n'
 annot_group_test <- function(dc) {
-  annots <- unique(as.character(dc$ann))
-  map(annots, function(ant) {
-    # for each annotation, test against all others
-    d1 <- dc |> 
-      filter(ann == ant) |> 
-      select(grp, n_sel = n)
-    d2 <- dc |> 
-      filter(ann != ant) |> 
-      group_by(grp) |> 
-      summarise(n_else = sum(n))
-    d <- inner_join(d1, d2, by = "grp")
-    # for each group test against others
-    grps <- unique(as.character(d$grp))
-    map(grps, function(gr) {
-      x1 <- d |> 
-        filter(grp == gr)
-      x2 <- d |> 
-        filter(grp != gr) |> 
-        summarise(n_sel = sum(n_sel), n_else = sum(n_else)) |> 
-        mutate(grp = "else")
-      x <- bind_rows(x1, x2) |> 
-        select(n_sel, n_else) |> 
-        as.matrix()
-      fisher.test(x, alternative = "two.sided")  |> 
-        broom::tidy() |> 
-        select(odds_ratio = estimate, ci_lo = conf.low, ci_up = conf.high, p_value = p.value) |> 
-        add_column(ann = ant, grp = gr, .before = 1)
-    }) |> 
-      list_rbind()
-  }) |> 
-    list_rbind() |> 
+  dc <- dc |>
+    mutate(
+      ann = as.character(ann),
+      grp = as.character(grp)
+    )
+
+  crossing(
+    ann = unique(dc$ann),
+    grp = unique(dc$grp)
+  ) |>
+    mutate(
+      tidied = map2(ann, grp, function(ant, gr) {
+        x <- dc |>
+          summarise(
+            a = sum(n[ann == ant & grp == gr]),
+            b = sum(n[ann != ant & grp == gr]),
+            c = sum(n[ann == ant & grp != gr]),
+            d = sum(n[ann != ant & grp != gr])
+          ) |>
+          as.numeric() |>
+          matrix(nrow = 2, byrow = TRUE)
+
+        depleted <- x[1, 1] / sum(x[1, ]) < x[2, 1] / sum(x[2, ])
+
+        fisher.test(x, alternative = "two.sided") |>
+          broom::tidy() |>
+          mutate(estimate = if_else(depleted, -estimate, estimate))
+      })
+    ) |>
+    unnest(tidied) |>
+    select(
+      ann, grp,
+      odds_ratio = estimate,
+      ci_lo = conf.low,
+      ci_up = conf.high,
+      p_value = p.value
+    ) |>
     mutate(fdr = p.adjust(p_value, method = "BH"))
 }

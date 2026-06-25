@@ -71,11 +71,11 @@ plot_volma <- function(res, point_size, point_alpha, scales = "fixed") {
 }
 
 plot_ma <- function(res, expr_var = log_cpm, fc_var = log_fc, p_var = p_value, fdr_var = fdr, 
-                    group_var = contrast, sel_genes = NULL, fdr_limit = 0.01, log_fc_limit = 0,
+                    group_var = contrast, sel_genes = NULL, fdr_limit = 0.01, logfc_limit = 0,
                     point_size = 0.5, point_alpha = 0.5) {
   
    if(is.null(sel_genes)) {
-    res <- res |> mutate(sel = {{ fdr_var }} < fdr_limit & abs({{ fc_var }}) >= log_fc_limit)
+    res <- res |> mutate(sel = {{ fdr_var }} < fdr_limit & abs({{ fc_var }}) >= logfc_limit)
   } else {
     res <- res |> mutate(sel = id %in% sel_genes)
   }
@@ -93,10 +93,10 @@ plot_ma <- function(res, expr_var = log_cpm, fc_var = log_fc, p_var = p_value, f
 }
 
 plot_volcano <- function(res, fc_var = log_fc, p_var = p_value, fdr_var = fdr, group_var = contrast,
-                         sel_genes = NULL, fdr_limit = 0.01, log_fc_limit = 1, point_size = 0.5,
+                         sel_genes = NULL, fdr_limit = 0.01, logfc_limit = 1, point_size = 0.5,
                          point_alpha = 0.5, scales = "fixed") {
   if(is.null(sel_genes)) {
-    res <- res |> mutate(sel = {{ fdr_var }} < fdr_limit & abs({{ fc_var }}) >= log_fc_limit)
+    res <- res |> mutate(sel = {{ fdr_var }} < fdr_limit & abs({{ fc_var }}) >= logfc_limit)
   } else {
     res <- res |> mutate(sel = id %in% sel_genes)
   }
@@ -128,20 +128,20 @@ plot_pdist <- function(res, p_var = p_value, group_var = contrast, n_bins = 50) 
 }
 
 plot_vmp <- function(res, expr_var = log_cpm, fc_var = log_fc, p_var = p_value, fdr_var = fdr,
-                     group_var = contrast, sel_genes = NULL, fdr_limit = 0.01, log_fc_limit = 0, point_size = 0.5, point_alpha = 0.5, n_bins = 50){
+                     group_var = contrast, sel_genes = NULL, fdr_limit = 0.01, logfc_limit = 0, point_size = 0.5, point_alpha = 0.5, n_bins = 50){
   list(
-    volcano = plot_volcano(res, {{fc_var}}, {{p_var}}, {{fdr_var}}, {{group_var}}, sel_genes, fdr_limit, log_fc_limit, point_size, point_alpha, scales = "free_x"),
-    ma = plot_ma(res, {{expr_var}}, {{fc_var}}, {{p_var}}, {{fdr_var}}, {{group_var}}, sel_genes, fdr_limit, log_fc_limit, point_size, point_alpha),
+    volcano = plot_volcano(res, {{fc_var}}, {{p_var}}, {{fdr_var}}, {{group_var}}, sel_genes, fdr_limit, logfc_limit, point_size, point_alpha, scales = "free_x"),
+    ma = plot_ma(res, {{expr_var}}, {{fc_var}}, {{p_var}}, {{fdr_var}}, {{group_var}}, sel_genes, fdr_limit, logfc_limit, point_size, point_alpha),
     pdist = plot_pdist(res, {{p_var}}, {{group_var}}, n_bins)
   )
 }
 
 
-plot_up_down <- function(dec, fdr_limit = 0.01) {
+plot_up_down <- function(dec, fdr_limit = 0.01, logfc_limit = 0) {
   env <- new.env(parent = globalenv())
 
   env$d <- dec |> 
-    filter(fdr < fdr_limit) |>
+    filter(fdr < fdr_limit & abs(log_fc) > logfc_limit) |>
     mutate(direction = case_when(
       log_fc > 0 ~ "Up",
       log_fc <= 0 ~ "Down"
@@ -298,7 +298,7 @@ plot_group_peak_annotations <- function(an, group_var = "group", annot_var = "an
     pl <- dc |> 
       ggplot(aes(x = grp, y = y, fill = ann)) +
       th() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
       geom_col(position = pos) +
       #scale_fill_manual(values = okabe_ito_palette) +
       scale_fill_manual(values = pal) +
@@ -669,4 +669,22 @@ plot_peaks_tss <- function(pks, rand_an = NULL, max_dist = 3000, ncol = 4, group
       labs(x = "Position relative to TSS", y = "Coverage")
   })
 
+}
+
+
+# tst should be created by annot_group_test()
+plot_annot_group_test <- function(tst, fdr_limit = 0.01, max_or = 5) {
+  sig_tst <- tst |> filter(fdr < fdr_limit)
+  mx <- max(abs(tst$odds_ratio))
+  if(mx > max_or) mx <- max_or
+  tst |> 
+    ggplot(aes(x = grp, y = ann, fill = odds_ratio)) +
+    th() +
+    theme(
+      axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+    ) +
+    geom_tile() +
+    geom_point(data = sig_tst, shape = 8, size = 2, stroke = 0.4) + 
+    scale_fill_distiller(type = "div", palette = "RdBu", limits = c(-mx, mx)) +
+    labs(x = NULL, y = NULL, fill = "Odds Ratio")
 }

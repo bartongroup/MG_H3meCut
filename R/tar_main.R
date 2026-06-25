@@ -128,7 +128,7 @@ targets_main <- function() {
         # Extract DE results in a useful format
         dec = extract_de_results(dbc),
 
-        fig_volcano = plot_volcano(dec),
+        fig_volcano = plot_volcano(dec, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit),
         fig_pdist = plot_pdist(dec),
         fig_up_down = plot_up_down(dec),
 
@@ -148,6 +148,14 @@ targets_main <- function() {
         fig_dec_rmsk_all = plot_peak_rmsk(dec_rmsk),
 
         fig_dec_rmsk = plot_group_peak_annotations(dec_rmsk_sig, group_var = "contrast_direction", annot_var = "rep_category", n_top = NULL, palette = 3),
+
+        # Test statistical sigificance of proportion results
+        tab_dec_chipseeker = tabulate_annotations(dec_chipseeker_sig, group_var = "contrast_direction", annot_var = "annotation"),
+        test_dec_chipseeker = annot_group_test(tab_dec_chipseeker),
+        fig_test_dec_chipseeker = plot_annot_group_test(test_dec_chipseeker),
+        tab_dec_rmsk = tabulate_annotations(dec_rmsk_sig, group_var = "contrast_direction", annot_var = "rep_category"),
+        test_dec_rmsk = annot_group_test(tab_dec_rmsk),
+        fig_test_dec_rmsk = plot_annot_group_test(test_dec_rmsk),
 
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
 
@@ -220,7 +228,7 @@ targets_main <- function() {
     mn_logfc_limit = 0.58,
     mn_ctr = c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl", "iPS_SETDB1-iPS_Ctrl"),
 
-    png_volcano = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast %in% mn_ctr), fdr_limit = mn_fdr_limit, log_fc_limit = mn_logfc_limit) |> gp("volcano", width = 7, height = 3),
+    png_volcano = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast %in% mn_ctr), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit) |> gp("volcano", width = 7, height = 3),
 
     png_groups_chipseeker = plot_group_peak_annotations(peaks_chipseeker_broad, rand_an = prand_chipseeker_broad) |> 
       gp("chipseeker_annotations", width = 4, height = 4),

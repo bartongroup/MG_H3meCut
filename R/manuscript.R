@@ -92,7 +92,7 @@ mn_plot_group_peak_annotations <- function(an, group_var = "group", annot_var = 
 }
 
 
-mn_plot_volcano <- function(res, fdr_limit = 0.01, log_fc_limit = 0, point_size = 0.5,
+mn_plot_volcano <- function(res, fdr_limit = 0.01, logfc_limit = 0, point_size = 0.5,
                             point_alpha = 0.5, scales = "fixed") {
   
   r <- res |>
@@ -100,8 +100,8 @@ mn_plot_volcano <- function(res, fdr_limit = 0.01, log_fc_limit = 0, point_size 
       x = log_fc,
       y = -log10(p_value),
       group = contrast,
-      up = fdr < fdr_limit & log_fc > log_fc_limit,
-      down = fdr < fdr_limit & log_fc < -log_fc_limit,
+      up = fdr < fdr_limit & log_fc > logfc_limit,
+      down = fdr < fdr_limit & log_fc < -logfc_limit,
     ) |>
     select(x, y, up, down, group)
 
