@@ -570,7 +570,7 @@ tar_read(fig_up_down_full_libs_broad)
 
 ```{r}
 #| label: fig-dec-chipseeker-full-libs-broad
-#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. *A* Proporiton of annotations among all peaks. *B* Fisher's test results for each group."
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proporiton of annotations among all peaks. **B** Fisher's test results for each group."
 #| fig-width: 8
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_chipseeker_full_libs_broad) 
@@ -638,11 +638,11 @@ tar_read(fig_up_down_groups_libs_broad)
 
 #### Annotation of differentially binding peaks
 
-@fig-dec-chipseeker-groups-libs-broad shows the proportion of *ChIPSeeker* annotations in each contrast, split between peaks going up and down. A Fisher's test on the proportion in each contrast/annotation against the pooled background was performed to asses the statistical significance of the observed changes. Panel *B* shows the results. Asterisks indicated groups significantly different from the pooled background. Another aspect of the same data is shown in @fig-dec-chipseeker-err-groups-libs-broad.
+@fig-dec-chipseeker-groups-libs-broad shows the proportion of *ChIPSeeker* annotations in each contrast, split between peaks going up and down. A Fisher's test on the proportion in each contrast/annotation against the pooled background was performed to asses the statistical significance of the observed changes. Panel **B** shows the results. Asterisks indicated groups significantly different from the pooled background. Another aspect of the same data is shown in @fig-dec-chipseeker-err-groups-libs-broad.
 
 ```{r}
 #| label: fig-dec-chipseeker-groups-libs-broad
-#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. *A* Proporiton of annotations among all peaks. *B* Fisher's test results for each group. The colour shows the odds ratio, with red indicating an enrichment and blue indicating a depletion. The asterisk indicates statistical significance."
+#| fig-cap: "*ChIPseeker* annotations of differentially abundant peaks in each contrast. **A** Proporiton of annotations among all peaks. **B** Fisher's test results for each group. The colour shows the odds ratio, with red indicating an enrichment and blue indicating a depletion. The asterisk indicates statistical significance."
 #| fig-width: 8
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_chipseeker_groups_libs_broad) 
