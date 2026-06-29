@@ -130,7 +130,7 @@ targets_main <- function() {
 
         fig_volcano = plot_volcano(dec, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit),
         fig_pdist = plot_pdist(dec),
-        fig_up_down = plot_up_down(dec),
+        fig_up_down = plot_up_down(dec, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit),
 
         # Annotate DE results
         dec_annotatr = annotate_peaks_annotatr(dec, annotations) |> reduce_annotatr(trans),
@@ -199,6 +199,8 @@ targets_main <- function() {
     tbl_rmsk_stats = readr::read_rds("cache/tbl_rmsk_stats.rds"),
 
     sav_rmsk_peaks = tbl_rmsk_peaks |> readr::write_csv("tab/rmask_peaks.csv"),
+
+    tbl_annot_fisher_example = annotation_fisher_example(test_dec_chipseeker_groups_libs_broad),
 
     db_none_broad = no_normalization(db_libs_broad),
     fig_norm_compare = plot_all_total_bindings(db_none_broad, db_libs_broad, db_spike_broad, metadata3),

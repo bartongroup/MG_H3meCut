@@ -331,30 +331,52 @@ annot_group_test <- function(dc) {
   ) |>
     mutate(
       tidied = map2(ann, grp, function(ant, gr) {
-        x <- dc |>
+        d <- dc |>
           summarise(
             a = sum(n[ann == ant & grp == gr]),
             b = sum(n[ann != ant & grp == gr]),
             c = sum(n[ann == ant & grp != gr]),
             d = sum(n[ann != ant & grp != gr])
-          ) |>
-          as.numeric() |>
+          )
+        x <- d |> 
+          as.numeric() |> 
           matrix(nrow = 2, byrow = TRUE)
 
         depleted <- x[1, 1] / sum(x[1, ]) < x[2, 1] / sum(x[2, ])
+        n_obs <- x[1, 1]
 
         fisher.test(x, alternative = "two.sided") |>
           broom::tidy() |>
-          mutate(estimate = if_else(depleted, -estimate, estimate))
+          mutate(
+            estimate = if_else(depleted, -estimate, estimate),
+            n_ann_grp = d$a,
+            n_notann_grp = d$b,
+            n_ann_notgrp = d$c,
+            n_notann_notgrp = d$d
+          )
       })
     ) |>
     unnest(tidied) |>
     select(
       ann, grp,
+      starts_with("n_"),
       odds_ratio = estimate,
       ci_lo = conf.low,
       ci_up = conf.high,
       p_value = p.value
     ) |>
     mutate(fdr = p.adjust(p_value, method = "BH"))
+}
+
+
+annotation_fisher_example <- function(tst, annot = "Promoter", group = "48h_Ctrl-iPS_Ctrl_up") {
+  d <- tst |> 
+    filter(ann == annot & grp == group) |> 
+    select(starts_with("n_"))
+
+  tribble(
+    ~., ~`With annotation`, ~`Without annotation`,
+    "In group", d$n_ann_grp, d$n_notann_grp,
+    "Not in group", d$n_ann_notgrp, d$n_notann_notgrp
+  )
 }
