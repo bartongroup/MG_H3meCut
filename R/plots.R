@@ -610,8 +610,8 @@ plot_all_genes_biotype <- function() {
 } 
 
 
-get_pileup_from_peaks <- function(pks, max_dist) {
-  regions <- pks |> 
+get_rel_start_end <- function(pks, max_dist) {
+  pks |> 
     distinct(grp, start, end, gene_start, distance_to_tss, gene_strand) |> 
     mutate(
       rel_start = if_else(gene_strand == 1, start - gene_start, gene_start - end),
@@ -620,7 +620,15 @@ get_pileup_from_peaks <- function(pks, max_dist) {
     filter(rel_start <= max_dist, rel_end >= -max_dist) |>
     mutate(
       rel_start = pmax(rel_start, -max_dist),
-      rel_end   = pmin(rel_end, max_dist),
+      rel_end   = pmin(rel_end, max_dist)
+    )
+}
+
+
+get_pileup_from_peaks <- function(pks, max_dist) {
+  regions <- pks |> 
+    get_rel_start_end(max_dist) |> 
+    mutate(
       end_event = rel_end + 1L
     )
  
@@ -638,6 +646,28 @@ get_pileup_from_peaks <- function(pks, max_dist) {
     ungroup()
 
   pileup
+}
+
+
+get_matrix_from_peaks <- function(pks, max_dist, n_peaks = 100) {
+  regions <- pks |> 
+    get_rel_start_end(max_dist) |> 
+    group_by(grp) |> 
+    slice_head(n = n_peaks) |> 
+    mutate(y = row_number()) |> 
+    ungroup()
+
+  peak_tiles <- regions |> 
+    transmute(grp, y, x = map2(rel_start, rel_end, seq)) |> 
+    unnest(x) |> 
+    mutate(value = 1L)
+
+  regions |> 
+    distinct(grp, y) |> 
+    crossing(x = -max_dist:max_dist) |> 
+    left_join(peak_tiles, by = join_by(grp, y, x)) |> 
+    mutate(value = replace_na(value, 0L)) |> 
+    arrange(grp, y, x)
 }
 
 plot_peaks_tss <- function(pks, rand_an = NULL, max_dist = 3000, ncol = 4, group_var = "group") {

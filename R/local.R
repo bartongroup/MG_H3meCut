@@ -98,6 +98,11 @@ num_overlaps_once <- function(A, B) {
 }
 
 rmsk_stats <- function(rmsk, pks, n_perm = 100, n_top = 20) {
+  # This is used implicitly by regioneR::randomizeRegions()
+  if (!requireNamespace("BSgenome.Hsapiens.UCSC.hg38", quietly = TRUE)) {
+    stop("Package BSgenome.Hsapiens.UCSC.hg38 is required for rmsk_stats().")
+  }
+
   gr_pk <- make_gr_regions(pks)
 
   fams <- rmsk$rep_fam |> 
@@ -130,7 +135,9 @@ rmsk_stats <- function(rmsk, pks, n_perm = 100, n_top = 20) {
     pt <- regioneR::permTest(
       A = gr_rm,
       B = gr_pk,
-      randomize.function = regioneR::randomizeRegions,
+      randomize.function = function(A, ...) {
+        regioneR::randomizeRegions(A = A, genome = "hg38")
+      },
       evaluate.function = num_overlaps_once,
       alternative = "greater",
       ntimes = n_perm,

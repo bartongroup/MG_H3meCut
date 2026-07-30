@@ -834,12 +834,12 @@ plot_grid(pl1, pl2, nrow = 1)
 
 @tbl-rmsk-stats shows the *RepeatMasker* families with the highest percentage of sequences containing MACS peaks (all consensus peaks were considered). Telomeric (telo) and centromeric (centr, acro) satellite repeats are strongly enriched in K9 peaks.
 
-A permutation test was performed to assess the statistical significance of the association. Both *RepeatMasker* sequences and MACS peaks were randomly distributed along all chromosomes and the overlap count was found. This was repeated 50 times (a rather small number of repeats due you time constraints - limiting the reported p-values to ~0.02). The mean overlap count, representing the expected count under the null hypothesis of no association between peaks and *RepeatMasker*, was found together with the corresponding p-value.   
+A permutation test was performed to assess the statistical significance of the association. Both *RepeatMasker* sequences and MACS peaks were randomly distributed along all chromosomes and the overlap count was found. This was repeated 100 times (a rather small number of repeats due you time constraints - limiting the reported p-values to ~0.01). The mean overlap count, representing the expected count under the null hypothesis of no association between peaks and *RepeatMasker*, was found together with the corresponding p-value.   
 
 ```{r}
 #| label: tbl-rmsk-stats
-#| tbl-cap: Percentage of *RepeatMasker* elements in a given family, containing at least one broad peak. RMF stands for *RepeatMasker* family. Only top 20 families are shown. The expected number of the RMF sequences containing a MACS peak and the corresponding p-values were calculated under the null hypothesis of the randomly distributed peaks and RM sequences, using a permutation test. Due to time constraints, tests with only 50 permutations were carried out, which resulted in the smallest possible p-value of 0.019. A p-value showing 0.019 constitutes an upper limit, so the actual p-values in these instances are likely smaller.
-tb <- tar_read(tbl_rmsk_stats) |> 
+#| tbl-cap: Percentage of *RepeatMasker* elements in a given family, containing at least one broad peak. RMF stands for *RepeatMasker* family. Only top 20 families are shown. The expected number of the RMF sequences containing a MACS peak and the corresponding p-values were calculated under the null hypothesis of the randomly distributed peaks and RM sequences, using a permutation test. Due to time constraints, tests with only 100 permutations were carried out, which resulted in the smallest possible p-value of 0.01. A p-value showing 0.019 constitutes an upper limit, so the actual p-values in these instances are likely smaller.
+tb <- tar_read(tbl_rmsk_stats) |>  
   mutate(n_not_over = n_rmask - n_over)
 tot_rmask <- sum(tb$n_rmask)
 tot_over = sum(tb$n_over)

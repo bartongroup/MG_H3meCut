@@ -195,7 +195,7 @@ targets_main <- function() {
 
     consensus_peaks = db_libs_broad |> extract_consensus(),
     tbl_rmsk_peaks =  annotate_peaks_rmsk(consensus_peaks, rmsk),
-    #tbl_rmsk_stats = rmsk_stats(rmsk, consensus_peaks, n_perm = 50, n_top = 20),
+    #tbl_rmsk_stats = rmsk_stats(rmsk, consensus_peaks, n_perm = 100, n_top = 20),
     tbl_rmsk_stats = readr::read_rds("cache/tbl_rmsk_stats.rds"),
 
     sav_rmsk_peaks = tbl_rmsk_peaks |> readr::write_csv("tab/rmask_peaks.csv"),
@@ -210,6 +210,9 @@ targets_main <- function() {
 
     fig_de_abu_example_1 = plot_peak_bindings(dbc_full_libs_broad, "5:70822898-70823402", metadata3),
     #fig_de_peak_example_1 = plot_region_ggbio_peak_id(dec_full_libs_broad |> dplyr::filter(contrast == "48h-iPS"), "5:70822898-70823402", config, metadata3, peaks_broad, peaks_narrow, normfac |> dplyr::mutate(norm = libs_norm)),
+
+    smpls = metadata |> filter(treatment == "Ctrl" & experiment == "Me3") |> pull(sample) |> as.character(),
+    png_atac_cut_example =plot_region_ggbio(smpls, config, metadata, make_region(18, 69935096, 69935793), peaks_broad = peaks_broad, peaks_narrow = peaks_narrow) |> gs("atac_cut_example", width = 8, height = 8),
 
     normfac = tibble::tibble(
       sample = db_libs_broad$samples$SampleID,
