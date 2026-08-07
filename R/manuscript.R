@@ -136,3 +136,24 @@ mn_plot_volcano <- function(res, fdr_limit = 0.01, logfc_limit = 0, point_size =
 
   g
 }
+
+
+mn_plot_annot_group_test <- function(tst, fdr_limit = 0.01, max_or = NULL) {
+  sig_tst <- tst |> filter(fdr < fdr_limit)
+  mx <- max(abs(tst$odds_ratio))
+  if(!is.null(max_or)){
+    mx <- max_or
+    tst <- tst |> 
+      mutate(odds_ratio = if_else(abs(odds_ratio) > mx, sign(odds_ratio) * mx, odds_ratio))
+  } 
+  tst |> 
+    ggplot(aes(x = grp, y = ann, fill = odds_ratio)) +
+    th() +
+    theme(
+      axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+    ) +
+    geom_tile() +
+    geom_point(data = sig_tst, shape = 8, size = 2, stroke = 0.4) + 
+    scale_fill_distiller(type = "div", palette = "RdBu", limits = c(-mx, mx)) +
+    labs(x = NULL, y = NULL, fill = "Odds Ratio")
+}

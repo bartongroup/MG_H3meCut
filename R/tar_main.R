@@ -231,16 +231,19 @@ targets_main <- function() {
   for_manuscript <- tar_plan(
     mn_fdr_limit = 0.01,
     mn_logfc_limit = 0.58,
-    mn_ctr = c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl", "iPS_SETDB1-iPS_Ctrl"),
 
-    png_volcano = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast %in% mn_ctr), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit) |> gp("volcano", width = 7, height = 3),
+    mn_ctr = c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl"),
+    pdf_volcano_1 = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast == mn_ctr[1]), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit) |>
+      gp(paste0("cut_volcano_", mn_ctr[1]), width = 4, height = 4),
+    pdf_volcano_2 = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast == mn_ctr[2]), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit) |>
+      gp(paste0("cut_volcano_", mn_ctr[2]), width = 4, height = 4),
 
-    png_groups_chipseeker = plot_group_peak_annotations(peaks_chipseeker_broad, rand_an = prand_chipseeker_broad) |> 
-      gp("chipseeker_annotations", width = 4, height = 4),
-    png_chipseeker_annotations = mn_plot_group_peak_annotations(dec_chipseeker_sig_groups_libs_broad, group_var = "contrast_direction", n_top = NULL) |>
-      gp("chipseeker_da", width = 4, height = 4),
-    png_chipseeker_rmsk = plot_group_peak_annotations(dec_rmsk_sig_groups_libs_broad, group_var = "contrast_direction", annot_var = "rep_category", n_top = NULL, palette = 3) |>
-      gp("rmsk_da", width = 4, height = 4)
+    mn_ctr_dir = c("48h_Ctrl-iPS_Ctrl_up", "48h_Ctrl-iPS_Ctrl_down"),
+
+    pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 2.1) |>
+      gp("cut_chipseeker_test", width = 2.8, height = 4),
+    pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 2.1) |>
+      gp("cut_rmsk_test", width = 2.8, height = 4)
     
   )
 
