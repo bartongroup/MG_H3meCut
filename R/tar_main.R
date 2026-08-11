@@ -240,11 +240,15 @@ targets_main <- function() {
 
     mn_ctr_dir = c("48h_Ctrl-iPS_Ctrl_up", "48h_Ctrl-iPS_Ctrl_down"),
 
-    pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 2.1) |>
-      gp("cut_chipseeker_test", width = 2.8, height = 4),
-    pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 2.1) |>
-      gp("cut_rmsk_test", width = 2.8, height = 4)
+    pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 1.7) |>
+      gp("cut_chipseeker_test", width = 2.7, height = 4),
+    pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 0.7) |>
+      gp("cut_rmsk_test", width = 2.7, height = 4),
     
+    pdf_test_chipseeker_annotations_full = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_broad, max_or = 1.7) |>
+      gp("cut_chipseeker_test_full", width = 3.8, height = 4),
+    pdf_test_rmsk_annotations_full = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_broad, max_or = 4) |>
+      gp("cut_rmsk_test_full", width = 3.6, height = 4)
   )
 
   for_shiny <- tar_plan(

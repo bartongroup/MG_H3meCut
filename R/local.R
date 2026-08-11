@@ -355,7 +355,8 @@ annot_group_test <- function(dc) {
         fisher.test(x, alternative = "two.sided") |>
           broom::tidy() |>
           mutate(
-            estimate = if_else(depleted, -estimate, estimate),
+            #estimate = if_else(depleted, -estimate, estimate),
+            estimate = estimate,
             n_ann_grp = d$a,
             n_notann_grp = d$b,
             n_ann_notgrp = d$c,
@@ -372,8 +373,14 @@ annot_group_test <- function(dc) {
       ci_up = conf.high,
       p_value = p.value
     ) |>
-    mutate(fdr = p.adjust(p_value, method = "BH"))
+    mutate(
+      fdr = p.adjust(p_value, method = "BH"),
+      log_odds_ratio = if_else(odds_ratio == 0, 0, log2(odds_ratio)),
+      p_in = n_ann_grp / (n_ann_grp + n_notann_grp),
+      p_out = n_ann_notgrp / (n_ann_notgrp + n_notann_notgrp)
+    )
 }
+
 
 
 annotation_fisher_example <- function(tst, annot = "Promoter", group = "48h_Ctrl-iPS_Ctrl_up") {

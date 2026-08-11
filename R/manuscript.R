@@ -138,16 +138,16 @@ mn_plot_volcano <- function(res, fdr_limit = 0.01, logfc_limit = 0, point_size =
 }
 
 
-mn_plot_annot_group_test <- function(tst, fdr_limit = 0.01, max_or = NULL) {
-  sig_tst <- tst |> filter(fdr < fdr_limit)
-  mx <- max(abs(tst$odds_ratio))
+mn_plot_annot_group_test <- function(tst, fdr_limit = 0.01, log_or_limit = 0.5, max_or = NULL) {
+  sig_tst <- tst |> filter(fdr < fdr_limit & abs(log_odds_ratio) > log_or_limit)
+  mx <- max(abs(tst$log_odds_ratio))
   if(!is.null(max_or)){
     mx <- max_or
     tst <- tst |> 
-      mutate(odds_ratio = if_else(abs(odds_ratio) > mx, sign(odds_ratio) * mx, odds_ratio))
+      mutate(log_odds_ratio = if_else(abs(log_odds_ratio) > mx, sign(log_odds_ratio) * mx, log_odds_ratio))
   } 
   tst |> 
-    ggplot(aes(x = grp, y = ann, fill = odds_ratio)) +
+    ggplot(aes(x = grp, y = ann, fill = log_odds_ratio)) +
     th() +
     theme(
       axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
@@ -155,5 +155,7 @@ mn_plot_annot_group_test <- function(tst, fdr_limit = 0.01, max_or = NULL) {
     geom_tile() +
     geom_point(data = sig_tst, shape = 8, size = 2, stroke = 0.4) + 
     scale_fill_distiller(type = "div", palette = "RdBu", limits = c(-mx, mx)) +
-    labs(x = NULL, y = NULL, fill = "Odds Ratio")
+    labs(x = NULL, y = NULL, fill = expression(log[2]~OR))
 }
+
+
