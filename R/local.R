@@ -394,3 +394,195 @@ annotation_fisher_example <- function(tst, annot = "Promoter", group = "48h_Ctrl
     "Not in group", d$n_ann_notgrp, d$n_notann_notgrp
   )
 }
+
+
+
+
+add_unannotated_peaks <- function(peaks, annotated, annot_var,
+                                  none = "none",
+                                  key = c("peak_id", "contrast")) {
+  stopifnot(
+    all(key %in% names(peaks)),
+    all(key %in% names(annotated)),
+    annot_var %in% names(annotated)
+  )
+
+  # The unannotated DE table should contain one row per peak and contrast.
+  if(anyDuplicated(peaks[key])) {
+    stop("`peaks` contains duplicated peak/contrast keys.")
+  }
+
+  annotated <- annotated |>
+    mutate("{annot_var}" := coalesce(as.character(.data[[annot_var]]), none))
+
+  annotated_keys <- annotated |>
+    select(all_of(key)) |>
+    distinct()
+
+  unannotated <- peaks |>
+    anti_join(annotated_keys, by = key) |>
+    mutate("{annot_var}" := none)
+
+  bind_rows(annotated, unannotated)
+}
+
+
+annot_de_test <- function(dec, fdr_limit, logfc_limit, annot_var) {
+  dc <- dec |> 
+    mutate(
+      ann = get(annot_var),
+      sig = fdr < fdr_limit & abs(log_fc) > logfc_limit
+    ) |> 
+    select(peak_id, chr, start, end, width, strand, contrast, contrast_direction, sig, ann)
+
+  ctrs <- unique(as.character(dc$contrast_direction))
+  # "none" indicates a peak missing an annotation
+  anns <- dc |>
+    distinct(ann) |>
+    filter(!is.na(ann), ann != "none") |>
+    pull(ann) |>
+    as.character()
+
+  dct <- dc |> distinct(contrast, contrast_direction)
+
+  map2(dct$contrast, dct$contrast_direction, function(ctr, ctrd) {
+    d_sig <- dc |>
+      filter(contrast_direction == ctrd & sig)
+    d_nsig <- dc |>
+      filter(contrast == ctr & !sig)
+
+    if(n_distinct(d_sig$peak_id) < 10)
+      return(NULL)
+
+    # peaks have multiple annotations, now look at peaks only
+    # we ignore GC content here, hence fake gc = 1 for make_matched_background()
+    pks_sig <- d_sig |> distinct(peak_id, chr, start, end, width, strand) |> add_column(gc = 1)
+    pks_nsig <- d_nsig |> distinct(peak_id, chr, start, end, width, strand) |> add_column(gc = 1)
+    bkg <- make_matched_background(pks_sig, pks_nsig, gc_bins = 1)
+
+    d_bkg <- d_nsig |> 
+      filter(peak_id %in% bkg$background$peak_id)
+
+    n_sig <- n_distinct(d_sig$peak_id)
+    n_bkg <- n_distinct(d_bkg$peak_id)
+
+    map(anns, function(an) {
+      a <- d_sig |>
+        filter(ann == an) |>
+        summarise(n = n_distinct(peak_id)) |>
+        pull(n)
+      
+      c <- d_bkg |>
+        filter(ann == an) |>
+        summarise(n = n_distinct(peak_id)) |>
+        pull(n)
+      
+      d <- tibble(
+        a = a,
+        b = n_sig - a,
+        c = c,
+        d = n_bkg - c
+      )
+
+      x <- d |> unlist() |> matrix(nrow = 2, byrow = TRUE)
+
+      n_obs <- x[1, 1]
+
+      fisher.test(x, alternative = "two.sided") |>
+        broom::tidy() |>
+        mutate(
+          estimate = estimate,
+          n_ann_grp = d$a,
+          n_notann_grp = d$b,
+          n_ann_notgrp = d$c,
+          n_notann_notgrp = d$d,
+          ann = an,
+          grp = ctrd
+        )
+    }) |>
+    list_rbind() |> 
+    select(
+      ann,
+      grp,
+      starts_with("n_"),
+      odds_ratio = estimate,
+      ci_lo = conf.low,
+      ci_up = conf.high,
+      p_value = p.value
+    ) |>
+    mutate(
+      fdr = p.adjust(p_value, method = "BH"),
+      log_odds_ratio = log2(odds_ratio),
+      p_in = n_ann_grp / (n_ann_grp + n_notann_grp),
+      p_out = n_ann_notgrp / (n_ann_notgrp + n_notann_notgrp)
+    )
+  }) |> 
+    list_rbind()
+}
+
+
+
+make_matched_background <- function(targets, universe, seed = 42,
+                                    width_bins = 10, gc_bins = 10,
+                                    n_per_target = 1) {
+  set.seed(seed)
+
+  stopifnot(all(c("peak_id", "width", "gc") %in% names(targets)))
+  stopifnot(all(c("peak_id", "width", "gc") %in% names(universe)))
+
+  target_ids <- unique(targets$peak_id)
+
+  targets2 <- targets |>
+    dplyr::ungroup() |>
+    dplyr::select(peak_id, chr, start, end, strand, width, gc) |>
+    dplyr::mutate(.set = "targets")
+
+  universe2 <- universe |>
+    dplyr::ungroup() |>
+    dplyr::filter(!peak_id %in% target_ids) |>
+    dplyr::select(peak_id, chr, start, end, strand, width, gc) |>
+    dplyr::mutate(.set = "background")
+
+  binned <- dplyr::bind_rows(targets2, universe2) |>
+    dplyr::mutate(
+      width_bin = dplyr::ntile(width, width_bins),
+      gc_bin = dplyr::ntile(gc, gc_bins),
+      bg_stratum = interaction(width_bin, gc_bin, drop = TRUE)
+    )
+
+  targets_strata <- binned |>
+    dplyr::filter(.set == "targets") |>
+    dplyr::count(bg_stratum, name = "n_targets")
+
+  bg_pool <- binned |>
+    dplyr::filter(.set == "background") |>
+    dplyr::inner_join(targets_strata, by = "bg_stratum")
+
+  bg_counts <- binned |>
+    dplyr::filter(.set == "background") |>
+    dplyr::count(bg_stratum, name = "n_background")
+
+  diagnostics <- targets_strata |>
+    dplyr::left_join(bg_counts, by = "bg_stratum") |>
+    dplyr::mutate(
+      n_background = dplyr::coalesce(n_background, 0L),
+      n_requested = n_targets * n_per_target,
+      n_sampled = pmin(n_background, n_requested),
+      enough_background = n_background >= n_requested
+    )
+
+  background <- bg_pool |>
+    dplyr::group_by(bg_stratum) |>
+    dplyr::group_split() |>
+    purrr::map_dfr(function(x) {
+      n_slice <- min(nrow(x), x$n_targets[1] * n_per_target)
+      dplyr::slice_sample(x, n = n_slice)
+    }) |>
+    dplyr::select(-.set, -n_targets)
+
+  list(
+    background = background,
+    diagnostics = diagnostics
+  )
+}
+
