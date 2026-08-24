@@ -499,6 +499,31 @@ Only broad peak results are shown in the following sections and in the Shiny app
 
 :::
 
+
+
+## PCA
+
+In order to create a PCA plot for peak data, consensus peaks present in at least two replicates in each condition were found using *DiffBind*, and normalised signal was found in each peak in each sample. These data were used to create a PCA plot shown in @fig-pca.
+
+```{r}
+#| label: fig-pca
+#| fig-cap: PCA plot for consensus peak data.
+#| fig-width: 5
+#| fig-height: 3.5
+tar_read(fig_pca) 
+```
+
+```{r}
+#| label: fig-pca-time
+#| fig-cap: PCA plot for consensus peak data split into iPS and 48h.
+#| fig-width: 8
+#| fig-height: 3.5
+pl1 <- tar_read(fig_pca_ips)
+pl2 <- tar_read(fig_pca_48)
+plot_grid(pl1, pl2, nrow = 1, labels = c("iPS", "48h")) 
+```
+
+
 ## Peak annotations
 
 We used to different packages to annotate peaks: *annotatr* and *ChIPseeker*. Both packages use different approaches and different genomic features for annotation. In particular, *ChIPseeker* includes intergenic regions, while *annotatr* does not. Also, *ChIPseeker* removes redundant hits (peak spanning multiple features, e.g. promoter-exon-intron; parallel annotations from alternative transcripts), while *annotatr* provides all redundant hits, including all hits from all transcripts. To make results more comparable, *annotatr* results were reduced by using canonical transcripts only.

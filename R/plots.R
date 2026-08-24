@@ -718,3 +718,32 @@ plot_annot_group_test <- function(tst, fdr_limit = 0.01, max_or = 5) {
     scale_fill_distiller(type = "div", palette = "RdBu", limits = c(-mx, mx)) +
     labs(x = NULL, y = NULL, fill = "Odds Ratio")
 }
+
+
+plot_pca <- function(db, meta) {
+  ms <- meta |> distinct(sample)
+  mat <- extract_bindings(db) |> 
+    right_join(ms, by = join_by(sample)) |> 
+    pivot_wider(names_from = sample, values_from = value) |>
+    column_to_rownames("peak_id") |>
+    as.matrix()
+
+  pca <- prcomp(t(log2(mat + 1)), scale. = TRUE)
+  var.perc <- 100 * (pca$sdev)^2 / sum((pca$sdev)^2)
+  
+  env <- new.env(parent = globalenv())
+  env$pca_df <- as_tibble(pca$x[, 1:2], rownames = "sample") |>
+    left_join(meta, by = "sample")
+  env$pca1 <- sprintf("PCA1 (%5.1f%%)", var.perc[1])
+  env$pca2 <- sprintf("PCA2 (%5.1f%%)", var.perc[2])
+
+  with(env, {
+    pca_df |> 
+      ggplot(aes(x = PC1, y = PC2, colour = group, shape = replicate)) +
+      th() +
+      geom_point(size = 3) +
+      scale_colour_manual(values = okabe_ito_palette) +
+      labs(x = pca1, y = pca2)
+  })
+}
+

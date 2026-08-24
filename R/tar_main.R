@@ -202,6 +202,10 @@ targets_main <- function() {
  
 
   for_report <- tar_plan(
+    fig_pca = plot_pca(db_libs_broad, metadata3),
+    fig_pca_ips = plot_pca(db_libs_broad, metadata3 |> filter(time_point == 'iPS')),
+    fig_pca_48 = plot_pca(db_libs_broad, metadata3 |> filter(time_point == '48h')),
+
     fig_all_biotype = plot_all_genes_biotype(),
 
     consensus_peaks = db_libs_broad |> extract_consensus(),
