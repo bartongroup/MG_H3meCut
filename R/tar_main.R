@@ -166,7 +166,9 @@ targets_main <- function() {
         test_de_chipseeker = annot_de_test(dec_chipseeker_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "annotation"),
         test_de_annotatr = annot_de_test(dec_annotatr_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "annotation"),
         test_de_rmsk = annot_de_test(dec_rmsk_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "rep_category"),
-        fig_test_de_rmsk = plot_annot_group_test(test_de_rmsk),
+        fig_test_de_chipseeker = mn_plot_annot_group_test(test_de_chipseeker, max_or = 3.8),
+        fig_test_de_annotatr = mn_plot_annot_group_test(test_de_annotatr),
+        fig_test_de_rmsk = mn_plot_annot_group_test(test_de_rmsk),
 
         sav_dec = write_dec(dec_chipseeker, paste0("diffbind_chipseeker_", MODEL, "_", NAME)),
 
@@ -215,7 +217,7 @@ targets_main <- function() {
 
     sav_rmsk_peaks = tbl_rmsk_peaks |> readr::write_csv("tab/rmask_peaks.csv"),
 
-    tbl_annot_fisher_example = annotation_fisher_example(test_dec_chipseeker_groups_libs_broad),
+    tbl_annot_fisher_example = annotation_fisher_example(test_de_chipseeker_groups_libs_broad),
 
     db_none_broad = no_normalization(db_libs_broad),
     fig_norm_compare = plot_all_total_bindings(db_none_broad, db_libs_broad, db_spike_broad, metadata3),

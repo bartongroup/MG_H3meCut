@@ -599,7 +599,7 @@ tar_read(fig_up_down_full_libs_broad)
 #| fig-width: 8
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_chipseeker_full_libs_broad) 
-pl2 <- tar_read(fig_test_dec_chipseeker_full_libs_broad)
+pl2 <- tar_read(fig_test_de_chipseeker_full_libs_broad)
 plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 ```
 
@@ -663,7 +663,7 @@ tar_read(fig_up_down_groups_libs_broad)
 
 #### Annotation of differentially binding peaks
 
-@fig-dec-chipseeker-groups-libs-broad shows the proportion of *ChIPSeeker* annotations in each contrast, split between peaks going up and down. A Fisher's test on the proportion in each contrast/annotation against the pooled background was performed to asses the statistical significance of the observed changes (see @sec-annotation-enrichment-note). Panel **B** shows the results. Asterisks indicated groups significantly different from the pooled background. Another aspect of the same data is shown in @fig-dec-chipseeker-err-groups-libs-broad.
+@fig-dec-chipseeker-groups-libs-broad shows the proportion of *ChIPSeeker* annotations in each contrast, split between peaks going up and down. A Fisher's test on the proportion in each contrast/annotation against the non-changing background was performed to asses the statistical significance of the observed changes (see @sec-annotation-enrichment-note). Panel **B** shows the results. Asterisks indicated groups significantly different from the pooled background. Another aspect of the same data is shown in @fig-dec-chipseeker-err-groups-libs-broad.
 
 ```{r}
 #| label: fig-dec-chipseeker-groups-libs-broad
@@ -671,7 +671,7 @@ tar_read(fig_up_down_groups_libs_broad)
 #| fig-width: 8
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_chipseeker_groups_libs_broad) 
-pl2 <- tar_read(fig_test_dec_chipseeker_groups_libs_broad)
+pl2 <- tar_read(fig_test_de_chipseeker_groups_libs_broad)
 plot_grid(pl1, pl2, nrow = 1, labels = c("A", "B"))
 ```
 
@@ -687,10 +687,14 @@ tar_read(fig_dec_chipseeker_err_groups_libs_broad)
 
 ```{r}
 #| label: annot-test-data
-tst <- tar_read(tbl_annot_fisher_example)
+tst <- tar_read(tbl_annot_fisher_example) 
 ```
 
-@{fig-dec-chipseeker-groups-libs-broad}B shows annotation enrichment results. Here we explain how it was calculated. For a given annotation and a group/contrast a contingency table, like the one shown in @tbl-annot-fisher-example, is created. It counts the number of peaks annotated as "Promoter" vs number of peaks with other annotations, in the group/contrast "48h_Ctrl-iPS_Ctrl_up" against all other contrasts. It is a test of a proportion. The null hypothesis is that the proportion in the first row (`r tst[1, 2]` / `r tst[1, 3]`) is the same as the proportion in the second row (`r tst[2, 2]` / `r tst[2, 3]`). That is, that that the proportion of peaks annotated as "Promoter" does not depend on the choice of contrast. A Fisher's exact test was used to assess the significance.
+@{fig-dec-chipseeker-groups-libs-broad}B shows annotation enrichment results. Here we explain how it was calculated.
+
+For each contrast, differentially bound peaks were separated according to the direction of change. For each annotation, the proportion of annotated peaks in each directional set was compared with that in a matched background. The background was sampled from all peaks not identified as differentially bound in the same contrast, matching the number and length distribution of the differentially bound peaks. Proportions were compared using a two-sided Fisher’s exact test, and P values were adjusted for multiple testing using the Benjamini–Hochberg method. An odds ratio (OR) greater than 1 indicates enrichment of the annotation among differentially bound peaks, whereas an OR less than 1 indicates depletion relative to the matched background.
+
+@tbl-annot-fisher-example shows the contingency table for annotation "Promoter" in contrast "48h_Ctrl-iPS_Ctrl_up". The null hypothesis is that the proportion in the first row (`r tst[1, 2]` / `r tst[1, 3]`) is the same as the proportion in the second row (`r tst[2, 2]` / `r tst[2, 3]`). That is, that that the proportion of peaks annotated as "Promoter" does not change between contrast and background. A Fisher's exact test was used to assess the significance.
 
 Please note that in some cases the counts in the top row (in a given contrast) are very small. This will result in a reduced sensitivity of the test and a lot of negative results (large p-values). This is particularly the case for contrast `48h_SETDB1-iPS_SETDB1_down`, where the peak counts are very small. Hence, lack of statistical significance does not mean lack of annotation enrichment.
 
@@ -698,7 +702,11 @@ Please note that in some cases the counts in the top row (in a given contrast) a
 #| label: tbl-annot-fisher-example
 #| tbl-cap: Example of contingency table used in the annotation enrichment test. The annotation is "Promoter" and the contrast/group is 48h_Ctrl-iPS_Ctrl_up.
 tst |> 
-  gt()
+  rename(
+    Promoter = `With annotation`,
+    `Not promoter` = `Without annotation`
+  ) |> 
+  gt() 
 ```
 
 

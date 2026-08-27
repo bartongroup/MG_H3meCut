@@ -390,8 +390,8 @@ annotation_fisher_example <- function(tst, annot = "Promoter", group = "48h_Ctrl
 
   tribble(
     ~., ~`With annotation`, ~`Without annotation`,
-    "In group", d$n_ann_grp, d$n_notann_grp,
-    "Not in group", d$n_ann_notgrp, d$n_notann_notgrp
+    "Significantly changing", d$n_ann_grp, d$n_notann_grp,
+    "In background", d$n_ann_notgrp, d$n_notann_notgrp
   )
 }
 
@@ -426,7 +426,7 @@ add_unannotated_peaks <- function(peaks, annotated, annot_var,
   bind_rows(annotated, unannotated)
 }
 
-
+# dec contains all peaks, annotated and unannotated
 annot_de_test <- function(dec, fdr_limit, logfc_limit, annot_var) {
   dc <- dec |> 
     mutate(
