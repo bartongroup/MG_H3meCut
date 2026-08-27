@@ -857,7 +857,7 @@ tar_read(fig_groups_rmsk_broad)
 #| fig-width: 7
 #| fig-height: 4
 pl1 <- tar_read(fig_dec_rmsk_groups_libs_broad)
-pl2 <- tar_read(fig_test_dec_rmsk_groups_libs_broad) 
+pl2 <- tar_read(fig_test_de_rmsk_groups_libs_broad)  
 plot_grid(pl1, pl2, nrow = 1)
 ```
 
