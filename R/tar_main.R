@@ -252,22 +252,32 @@ targets_main <- function() {
     mn_fdr_limit = 0.01,
     mn_logfc_limit = 0.58,
 
+    pfd_pca = plot_pca(db_libs_broad, metadata3) |> gp("cut_pca", width = 5.5, height = 4),
+
     mn_ctr = c("48h_Ctrl-iPS_Ctrl", "48h_SETDB1-48h_Ctrl"),
     pdf_volcano_1 = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast == mn_ctr[1]), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit) |>
       gp(paste0("cut_volcano_", mn_ctr[1]), width = 4, height = 4),
     pdf_volcano_2 = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast == mn_ctr[2]), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit) |>
       gp(paste0("cut_volcano_", mn_ctr[2]), width = 4, height = 4),
+    pdf_volcano_3 = mn_plot_volcano(dec_chipseeker_groups_libs_broad |> filter(contrast %in% c("48h_SETDB1-48h_Ctrl", "iPS_SETDB1-iPS_Ctrl")), fdr_limit = mn_fdr_limit, logfc_limit = mn_logfc_limit, ncol = 1) |>
+      gp(paste0("cut_volcano_2"), width = 4, height = 7),
+
+    pdf_up_down = fig_up_down_groups_libs_broad |> 
+      gp("cut_up_down", width = 3, height = 4),
+
 
     mn_ctr_dir = c("48h_Ctrl-iPS_Ctrl_up", "48h_Ctrl-iPS_Ctrl_down"),
 
-    #pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_dec_chipseeker_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 1.7) |>
-    #  gp("cut_chipseeker_test", width = 2.7, height = 4),
-    #pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_dec_rmsk_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 0.7) |>
-    #  gp("cut_rmsk_test", width = 2.7, height = 4),
+    pdf_groups_chipseeker = fig_groups_chipseeker_narrow |> gp("cut_groups_chipseeker", width = 3.5, height = 3.5),
+
+    pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_de_chipseeker_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 3) |>
+      gp("cut_chipseeker_test", width = 2.7, height = 4),
+    pdf_test_rmsk_annotations = mn_plot_annot_group_test(test_de_rmsk_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 3) |>
+      gp("cut_rmsk_test", width = 2.7, height = 4),
     
     pdf_test_chipseeker_annotations_full = mn_plot_annot_group_test(test_de_chipseeker_groups_libs_broad, max_or = 3.2) |>
       gp("cut_chipseeker_test_full", width = 3.8, height = 4),
-    pdf_test_rmsk_annotations_full = mn_plot_annot_group_test(test_de_rmsk_groups_libs_broad, max_or = 3.4) |>
+    pdf_test_rmsk_annotations_full = mn_plot_annot_group_test(test_de_rmsk_groups_libs_broad, max_or = 3) |>
       gp("cut_rmsk_test_full", width = 3.6, height = 4),
     pdf_test_rmsk_annotations_ltr = mn_plot_annot_group_test(test_de_rmsk_ltr_groups_libs_broad, max_or = 4.7) |>
       gp("cut_rmsk_test_ltr", width = 3.3, height = 4),
