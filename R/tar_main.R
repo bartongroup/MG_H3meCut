@@ -94,7 +94,11 @@ targets_main <- function() {
       # Prepare for DiffBind
       meta_db = make_diffbind_metadata(metadata3, config, type = TYPE),
       sav_meta_db = make_diffbind_metadata_for_cluster(metadata3, config, type = TYPE),
-      # These steps are very slow, so we cache the result
+      # These steps are very slow and require a lot of memory, so we run it on
+      # the cluster and cache the result. After creating
+      # "diffbind_metadata_*.csv" copy them to the cluster and run the script
+      # "diffbind_count_cluster.R" with each file. Copy *.rds files back here.
+      # If your machine has enough memory (>100 GB), uncomment the line below.
       # db = read_and_count_diffbind(meta_db, min_overlap = 2),
       # db_spike = spikein_normalization(dbc),
     )
