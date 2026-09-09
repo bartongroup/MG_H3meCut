@@ -146,6 +146,7 @@ targets_main <- function() {
         dec_chipseeker_all = add_unannotated_peaks(dec, dec_chipseeker, annot_var = "annotation"),
         dec_rmsk_all = add_unannotated_peaks(dec, dec_rmsk, annot_var = "rep_category"),
         dec_rmsk_all_ltr = add_unannotated_peaks(dec, dec_rmsk |> dplyr::filter(rep_category == "LTR"), annot_var = "rep_family"),
+        dec_rmsk_all_sine = add_unannotated_peaks(dec, dec_rmsk |> dplyr::filter(rep_category == "SINE"), annot_var = "rep_family"),
 
         dec_annotatr_sig = dec_annotatr |> dplyr::filter(fdr < params$fdr_limit & abs(log_fc) > params$logfc_limit),
         dec_chipseeker_sig = dec_chipseeker |> dplyr::filter(fdr < params$fdr_limit & abs(log_fc) > params$logfc_limit),
@@ -172,6 +173,7 @@ targets_main <- function() {
         test_de_annotatr = annot_de_test(dec_annotatr_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "annotation"),
         test_de_rmsk = annot_de_test(dec_rmsk_all, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "rep_category"),
         test_de_rmsk_ltr = annot_de_test(dec_rmsk_all_ltr, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "rep_family"),
+        test_de_rmsk_sine = annot_de_test(dec_rmsk_all_sine, fdr_limit = params$fdr_limit, logfc_limit = params$logfc_limit, annot_var = "rep_family"),
         fig_test_de_chipseeker = mn_plot_annot_group_test(test_de_chipseeker, max_or = 3.8),
         fig_test_de_annotatr = mn_plot_annot_group_test(test_de_annotatr),
         fig_test_de_rmsk = mn_plot_annot_group_test(test_de_rmsk, max_or = 3.4),
@@ -272,7 +274,14 @@ targets_main <- function() {
 
     mn_ctr_dir = c("48h_Ctrl-iPS_Ctrl_up", "48h_Ctrl-iPS_Ctrl_down"),
 
-    pdf_groups_chipseeker = fig_groups_chipseeker_narrow |> gp("cut_groups_chipseeker", width = 3.5, height = 3.5),
+    pdf_groups_chipseeker = fig_groups_chipseeker_broad |> gp("cut_groups_chipseeker", width = 3.5, height = 3.5),
+
+    pdf_rmsk_ltr_up = dec_rmsk_groups_libs_broad |> filter(contrast == "48h_Ctrl-iPS_Ctrl", fdr < mn_fdr_limit, log_fc > mn_logfc_limit, rep_category == "LTR") |> mutate(rep_family = str_remove(rep_family, "\\?")) |> 
+      plot_group_peak_annotations(group_var = "contrast_direction", annot_var = "rep_family", n_top = Inf) |> 
+      gp("cut_rmsk_ltr", width = 2.6, height = 4),
+    pdf_rmsk_sine_down = dec_rmsk_groups_libs_broad |> filter(contrast %in% c("48h_SETDB1-48h_Ctrl", "iPS_SETDB1-iPS_Ctrl"), fdr < mn_fdr_limit, log_fc < -mn_logfc_limit, rep_category == "SINE" & rep_family %in% c("Alu", "MIR")) |> mutate(rep_family = str_remove(rep_family, "\\?")) |> 
+      plot_group_peak_annotations(group_var = "contrast_direction", annot_var = "rep_family", n_top = Inf) |> 
+      gp("cut_rmsk_sine", width = 2.6, height = 4.5),
 
     pdf_test_chipseeker_annotations = mn_plot_annot_group_test(test_de_chipseeker_groups_libs_broad |> filter(grp %in% mn_ctr_dir), max_or = 3) |>
       gp("cut_chipseeker_test", width = 2.7, height = 4),
@@ -285,6 +294,8 @@ targets_main <- function() {
       gp("cut_rmsk_test_full", width = 3.6, height = 4),
     pdf_test_rmsk_annotations_ltr = mn_plot_annot_group_test(test_de_rmsk_ltr_groups_libs_broad, max_or = 4.7) |>
       gp("cut_rmsk_test_ltr", width = 3.3, height = 4),
+    pdf_test_rmsk_annotations_sine = mn_plot_annot_group_test(test_de_rmsk_sine_groups_libs_broad |> dplyr::filter(ann != "SINE?"), max_or = 2.2) |>
+      gp("cut_rmsk_test_sine", width = 3.3, height = 3.3),
 
   )
 
